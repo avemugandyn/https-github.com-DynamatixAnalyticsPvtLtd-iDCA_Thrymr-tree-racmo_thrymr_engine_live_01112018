@@ -27,27 +27,35 @@ from PIL import Image
 from shutil import copyfile
 import psycopg2
 from sqlalchemy import create_engine
-
+import multiprocessing as mp
 from configuration.configuration import ConfigClass,PyDbLite,DbConf
+
+
 def keywordimport():
-        engine = create_engine(ConfigClass.SQLALCHEMY_DATABASE_URI)
-        keyword_df= pd.read_sql_query('SELECT k.id,fc.file_class_name as fileclass,ft.type,p.purpose_type,k.decision_type,k.keyword_list,bia.file_class_name as bias FROM keywords k left Join file_class fc on fc.id = k.file_class_id left Join file_class bia on bia.id = k.bias left Join file_class f on f.id = k.file_class_id left Join file_types ft on ft.id = k.file_type_id left Join purpose p on p.id = k.purpose_id',engine)
-    #         with open('Final_Keyword_Analysis.pickle', 'rb') as handle:
-    #             b=pickle.load(handle)
-    #         kxddf=b['keywordsX']
-    #         kxddf.drop(173,inplace=True)
-        #copy1 postgres copy2 pydblite
-        pyDbLite_db = PyDbLite().pyDbLite_db
-        pyDb_id = pyDbLite_db.insert(keyword_df=keyword_df)
-        keyword_df=keyword_df.rename(columns={"keyword_list": "keyword","type":"filetype","purpose_type":"purpose"})
-        keyword_df['keyword']=keyword_df['keyword'].apply(lambda x:json.loads(x))
-        return keyword_df, pyDb_id
+    engine = create_engine(ConfigClass.SQLALCHEMY_DATABASE_URI)
+    keyword_df= pd.read_sql_query('SELECT k.id,fc.file_class_name as fileclass,ft.type,p.purpose_type,\
+    k.decision_type,k.keyword_list,bia.file_class_name as bias FROM keywords k left Join file_class fc \
+    on fc.id = k.file_class_id left Join file_class bia on bia.id = k.bias left Join file_class f \
+    on f.id = k.file_class_id left Join file_types ft on ft.id = k.file_type_id left Join purpose p \
+    on p.id = k.purpose_id',engine)
+#         with open('Final_Keyword_Analysis.pickle', 'rb') as handle:
+#             b=pickle.load(handle)
+#         kxddf=b['keywordsX']
+#         kxddf.drop(173,inplace=True)
+    #copy1 postgres copy2 pydblite
+    pyDbLite_db = PyDbLite().pyDbLite_db
+    pyDb_id = pyDbLite_db.insert(keyword_df=keyword_df)
+    keyword_df=keyword_df.rename(columns={"keyword_list": "keyword","type":"filetype","purpose_type":"purpose"})
+    keyword_df['keyword']=keyword_df['keyword'].apply(lambda x:json.loads(x))
+    return keyword_df, pyDb_id
+
 
 def get_pgnum(filename):
     pdf = pdfquery.PDFQuery(ConfigClass.UPLOAD_FOLDER + "/" + filename)
     pdf.load()
     pgn = len(pdf.tree.getroot().getchildren())
     return pgn
+
 
 def get_structured_files_dataframe(df):
     tmp = pd.DataFrame(columns=["file","file_id","group"])
@@ -128,56 +136,57 @@ def get_rtf_text(path):
 def parse_ticket(pdf_path):
     _JSON = {"filepath" : pdf_path}
     try:
-            pdf = pdfquery.PDFQuery(pdf_path)
-            pdf.load()
-            root = pdf.tree.getroot().getchildren()[0]
-            page_box = [float(x) for x in root.get("bbox")[1:-1].split(",")]
-            tables, _ =\
-            zip(
-                *sorted(
-                    [(p.bounds,p.area) for p in cascaded_union(
-                        [box(*[float(x) for x in node.get("bbox")[1:-1].split(",")]) for node in root.iter() if node.tag == "LTRect"]
-                    )],
-                    key = lambda x : -x[1]
-                )
+        pdf = pdfquery.PDFQuery(pdf_path)
+        pdf.load()
+        root = pdf.tree.getroot().getchildren()[0]
+        page_box = [float(x) for x in root.get("bbox")[1:-1].split(",")]
+        tables, _ =\
+        zip(
+            *sorted(
+                [(p.bounds,p.area) for p in cascaded_union(
+                    [box(*[float(x) for x in node.get("bbox")[1:-1].split(",")])
+                     for node in root.iter() if node.tag == "LTRect"]
+                )],
+                key = lambda x : -x[1]
             )
-            X = page_box[2]
-            Y = page_box[3]
-            xf = 11.69/X
-            yf = 8.27/Y
-            t1, t2 = tables
+        )
+        X = page_box[2]
+        Y = page_box[3]
+        xf = 11.69/X
+        yf = 8.27/Y
+        t1, t2 = tables
 
-            table_1_bbox = ":".join(map(str,(t1[0]*xf - 0.1, (Y - t1[3])*yf - 0.1, t1[2]*xf + 0.1, (Y - t1[1])*yf + 0.1)))
-            table_2_bbox = ":".join(map(str,(t2[0]*xf - 0.1, (Y - t2[3])*yf - 0.1, t2[2]*xf + 0.1, (Y - t2[1])*yf + 0.1)))
+        table_1_bbox = ":".join(map(str,(t1[0]*xf - 0.1, (Y - t1[3])*yf - 0.1, t1[2]*xf + 0.1, (Y - t1[1])*yf + 0.1)))
+        table_2_bbox = ":".join(map(str,(t2[0]*xf - 0.1, (Y - t2[3])*yf - 0.1, t2[2]*xf + 0.1, (Y - t2[1])*yf + 0.1)))
 
-            df1 =\
-            pd.DataFrame(
-                pte.table_to_list(
-                    pte.process_page(
-                        pdf_path,
-                        "1",
-                        crop = table_1_bbox,
-                        pad=20
-                    ),
-                    "1"
-                )[1]
-            )
-            _JSON["table_1"] = df_to_json(df1)
-            df2 = \
-            pd.DataFrame(
-                pte.table_to_list(
-                    pte.process_page(
-                        pdf_path,
-                        "1",
-                        crop = table_2_bbox,
-                        pad=20
-                    ),
-                    "1"
-                )[1]
-            )
-            df2.columns = df2.iloc[0]
-            df2 = df2.reindex(df2.index.drop(0))
-            _JSON["table_2"] = df2.to_json(orient='index')
+        df1 =\
+        pd.DataFrame(
+            pte.table_to_list(
+                pte.process_page(
+                    pdf_path,
+                    "1",
+                    crop = table_1_bbox,
+                    pad=20
+                ),
+                "1"
+            )[1]
+        )
+        _JSON["table_1"] = df_to_json(df1)
+        df2 = \
+        pd.DataFrame(
+            pte.table_to_list(
+                pte.process_page(
+                    pdf_path,
+                    "1",
+                    crop = table_2_bbox,
+                    pad=20
+                ),
+                "1"
+            )[1]
+        )
+        df2.columns = df2.iloc[0]
+        df2 = df2.reindex(df2.index.drop(0))
+        _JSON["table_2"] = df2.to_json(orient='index')
     except Exception as e:
             return('Error:'+str(e))
 
@@ -216,9 +225,9 @@ def update_filetype(fdf):
         filetypes=[]
         file_ids=[]
         for ind in v:
-                files.append(fdf.loc[ind,'filename'])
-                filetypes.append(fdf.loc[ind,'filetype'])
-                file_ids.append(fdf.loc[ind,'file_id'])
+            files.append(fdf.loc[ind,'filename'])
+            filetypes.append(fdf.loc[ind,'filetype'])
+            file_ids.append(fdf.loc[ind,'file_id'])
         fgdf.loc[i,'filetypes']=filetypes
         fgdf.loc[i,'files']=files
         fgdf.loc[i,'file_ids']=file_ids
@@ -273,28 +282,21 @@ def fileAnalysis(fdf,kdf):
                     fdf.loc[j,kr['fileclass']] = c
     print("Part2")
     for i, row in fdf.iterrows():
-            if row['N2']>0:
-                f=False
-                for soli in solicitor_list:
-                    sols=[m.start() for m in re.finditer(soli.lower(), ' '.join(fdf.loc[i,'text_response'].split()))]
-                    if(len(sols)>=1):
-                        f=True
-                if (not f and  (suspendword.lower() in ' '.join(fdf.loc[i,'text_response'].split() ))):
-                        row['N12']=1
-            keyscore=dict(row[list(set(classlis))])
-            predicted=max(keyscore, key=keyscore.get)
-            if 'N5'in row.to_dict().keys() and row['N5']>0:
-                fdf.loc[i,'predicted_class']='N5'
-            elif set(['N2','N4'])<= set(ddf.columns) and row['N2']>0 and row['N4']>0:
-                    fdf.loc[i,'predicted_class'] = 'N2+N4'
-            elif set(['N1','N9','N10'])<= set(ddf.columns) and row['N1']>0 and (row['N10']>0 or row['N9']>0):
-                    fdf.loc[i,'predicted_class'] = 'N1'
-            elif keyscore[predicted]>0:
-                fdf.loc[i,'predicted_class']=predicted
-            if predicted == 'N4' :
-                for n11k in N11_possible_keyword:
-                    if ''.join(unidecode.unidecode(n11k.lower()).split()) in ''.join(row['text_response'].split()):
-                        fdf.loc[i,'predicted_class']='N11'
+        if(len(classlist)>0):
+            keyscore = dict(row[classlist])
+        else:
+            keyscore = {'Nan':0}
+        predicted = max(keyscore, key=keyscore.get)
+        if 'N5' in row.to_dict().keys() and row['N5']>0:
+            fdf.loc[i,'predicted_class'] = 'N5'
+        elif set(['N2','N4'])<= set(fdf.columns) and row['N2']>0 and row['N4']>0:
+            fdf.loc[i,'predicted_class'] = 'N2+N4'
+        elif set(['N1','N9','N10'])<= set(fdf.columns) and row['N1']>0 and (row['N10']>0 or row['N9']>0):
+            fdf.loc[i,'predicted_class'] = 'N1'
+        elif set(['N6','N2','N10'])<= set(fdf.columns) and row['N10']>0 and (row['N2']>0 or row['N6']>0):
+            fdf.loc[i,'predicted_class'] = 'N2+N4'
+        elif keyscore[predicted]>0:
+            fdf.loc[i,'predicted_class'] = predicted
     return fdf
 
 
@@ -340,16 +342,21 @@ def filegroupAnalysis(ddf,fgdf):
 
 
 def get_textExtract(fgdf,fdf,kdf):
-    procedures={'CAM':'Cambiario','COG':'Cognicion','CON':'Concurso Acreedores','EJE':'Juicio Ejecutivo','ETJ':'EJECUCION DE TITULOS JUDICIAL','ETJH':'ETJ Continuacion Hipotecario','ETN':'EJECUCION DE TITULOS NO JUDICIAL',\
-                'HIP':'EJECUCION Hipotecaria','MCU':'Menor Cuantia','MON':'Monitorio','ORD':'Concurso Ordinario','TDO':'Terceria De Domino','TMD':'Terceria De Mejor Derecho','VER':'Verbal','PEN':'Penal','RAP':'Recurso De Apelacion',\
-                'PTC':'Pieza Tasacion Costas','PSO':'Pieza Seperada Oposicion','AUX':'Auxilio Nacional','CNJ':'Cosignacion Judicial','RCS':'Recurso De Casacion','INC':'Incidente Concursal','MC':'Medidas Cautelares','CN':'Conciliacion'}
+    procedures={'CAM':'Cambiario','COG':'Cognicion','CON':'Concurso Acreedores','EJE':'Juicio Ejecutivo',
+                'ETJ':'EJECUCION DE TITULOS JUDICIAL','ETJH':'ETJ Continuacion Hipotecario','ETN':'EJECUCION DE TITULOS NO JUDICIAL',\
+                'HIP':'EJECUCION Hipotecaria','MCU':'Menor Cuantia','MON':'Monitorio','ORD':'Concurso Ordinario',
+                'TDO':'Terceria De Domino','TMD':'Terceria De Mejor Derecho','VER':'Verbal','PEN':'Penal','RAP':'Recurso De Apelacion',\
+                'PTC':'Pieza Tasacion Costas','PSO':'Pieza Seperada Oposicion','AUX':'Auxilio Nacional','CNJ':'Cosignacion Judicial',
+                'RCS':'Recurso De Casacion','INC':'Incidente Concursal','MC':'Medidas Cautelares','CN':'Conciliacion'}
     numspan={"1":"uno","2":"dos","3":"tres","4":"cuatro","5":"cinco",\
              "6":"seis","7":"siete","8":"ocho","9":"nueve","10":"diez",\
              "11":"once","12":"doce","13":"trece","14":"catorce","15":"quince",\
              "16":"dieciseis","17" :"diecisiete","18":"dieciocho","19":"diecinueve",\
              "20" : "veinte","21" : "veintiuno","22"  :"veintidos","23" : "veintitres","24" : "veinticuatro","25" : "veinticinco",\
              "26":"veintiseis","27" :"veintisiete","28": "veintiocho","29"  :"veintinueve","30" : "treinta"}
-    numcat={"1":"un","2":"dos","3":"tres","4":"quatre","5":"cinc","6":"sis","7":"set","8":"vuit","9":"nou","10":"deu","11":"onze","12":"dotze","13":"tretze","14":"catorze","15":"quinze","16":"setze","17" :"disset","18":"divuit","19":"dinou","20" : "vint"}
+    numcat={"1":"un","2":"dos","3":"tres","4":"quatre","5":"cinc","6":"sis","7":"set","8":"vuit","9":"nou","10":"deu",
+            "11":"onze","12":"dotze","13":"tretze","14":"catorze","15":"quinze","16":"setze","17" :"disset","18":"divuit",
+            "19":"dinou","20" : "vint"}
     extKeywords=kdf[kdf['purpose']=='EXTRACTION']
     extKeywords['decision_type']=extKeywords['decision_type'].apply(lambda x : x.split('-')[1])
     c=0
@@ -370,7 +377,6 @@ def get_textExtract(fgdf,fdf,kdf):
                 fgdf.loc[fi,'Court']=s.split('\n')[0]
                 if 'procurador' in s.lower():
                     fgdf.loc[fi,'Solictor']=list(filter(None,s[s.lower().index('procurador')+10:].split('\n')))[0]
-
 
                 ptype=""
 
@@ -536,7 +542,7 @@ def insert_mongo(pdf_path,filename):
     fs = GridFS(mdb)
     pdf_data = fs.put(pdf_data, filename=filename.split('.')[0])
 
-    # read in the image.
+    # read in the image.Racmo_backendconfiguration
     imgpath=join(ConfigClass.UPLOAD_FOLDER, filename.split('.')[0]+'.png')
     copyfile(pdf_path, imgpath)
     try:
@@ -566,7 +572,6 @@ def insert_mongo(pdf_path,filename):
     data = { "filename":filename,
             "image_file": img_data,
             "actualfile": pdf_data,
-
            }
     mongo_id = fileData.insert_one(data)
     os.remove(imgpath)
@@ -574,16 +579,15 @@ def insert_mongo(pdf_path,filename):
 
 def read_pdf_n_insert(pdf_dir_root):
     PDF_DIR = pdf_dir_root
-    pdf_files = [f for f in listdir(PDF_DIR)\
-                 if isfile(join(PDF_DIR,  f)) ]
-    ##############
-    ##Save in mongo
-    #############
+    pdf_files = [f for f in listdir(PDF_DIR) if isfile(join(PDF_DIR,  f))]
+    ###################
+    ## Save in mongo ##
+    ###################
     ls=list()
     mongo_ids=dict()
     for pdf_file in pdf_files:
-        mongo_ids.update({pdf_file:insert_mongo(join(pdf_dir_root,pdf_file),pdf_file)})
-        # mongo_ids.update({pdf_file:1})
+        # mongo_ids.update({pdf_file:insert_mongo(join(pdf_dir_root,pdf_file),pdf_file)})
+        mongo_ids.update({pdf_file:1})
         ls.append(pdf_file.split('_'))
     df=pd.DataFrame(ls)
     # df1=df.groupby(3)
@@ -592,24 +596,22 @@ def read_pdf_n_insert(pdf_dir_root):
     ls=[]
     i=0
     for k,gdf in  fg:
-        fglist=[]
-        elist=[]
-        flist=[]
+        fglist, elist, flist = [], [], []
         for i, row in gdf.iterrows():
-            row=row.dropna()
-            fln='_'.join(list(row))
+            row = row.dropna()
+            fln = '_'.join(list(row))
             flist.append(fln)
             elist.append(fln[-3:].lower())
         fgroup={'group':k,'files':flist,'length':len(flist),'min_filename':min(flist, key=len),'extensions':elist}
-        ##
+        
         #save fgroup in postgres in filegroup#
-        conn = psycopg2.connect(database=DbConf.name, user=DbConf.username,
-                                password=DbConf.password,host=DbConf.host, port=DbConf.port)
-        # insert data in tag Table
-        cur = conn.cursor()
-        cur.execute("insert into file_group (file_group_name) values('" + k + "') RETURNING id;")
-        fg_id = cur.fetchone()[0]
-        fglist.append(fg_id)
+        # conn = psycopg2.connect(database=DbConf.name, user=DbConf.username,
+        #                         password=DbConf.password,host=DbConf.host, port=DbConf.port)
+        # # insert data in tag Table
+        # cur = conn.cursor()
+        # cur.execute("insert into file_group (file_group_name) values('" + k + "') RETURNING id;")
+        # fg_id = cur.fetchone()[0]
+        fglist.append(1)
 
 #         fg=inserpg_filegroup(fgroup)
         ####
@@ -620,14 +622,14 @@ def read_pdf_n_insert(pdf_dir_root):
 
             ##save file in postgres
 #             fidlis.append(insertpg_file(f,fg))
-            cur1 = conn.cursor()
+#             cur1 = conn.cursor()
 
-            cur1.execute("insert into file_info (file_group_id,file_data_id,file_name) values(" +str(fg_id)+",'"+str(file_data_id)+"','"+f+"') RETURNING id;")
-            f_info_id = cur1.fetchone()[0]
-            fidlis.append(f_info_id)
+#             cur1.execute("insert into file_info (file_group_id,file_data_id,file_name) values(" +str(fg_id)+",'"+str(file_data_id)+"','"+f+"') RETURNING id;")
+#             f_info_id = cur1.fetchone()[0]
+            fidlis.append(i)
             i+=1
             ##
-        conn.commit()
+        # conn.commit()
         fgroup['file_ids']=fidlis
         ls.append(fgroup)
     flgdf=pd.DataFrame(ls)
@@ -652,38 +654,44 @@ def read_pdf_n_insert(pdf_dir_root):
     #######
     #kdf from pg admin and keyword analysis from pydblite
     kdf,_=keywordimport()
-    fdf=fileAnalysis(fdf,kdf)
-
+    # fdf=fileAnalysis(fdf,kdf)
+    pool = mp.Pool(processes=4)
+    ind=int()
+    results = [pool.apply(fileAnalysis, args=(fdf[int(x*len(fdf)/10):int((x+1)*len(fdf)/10)],kdf,)) for x in range(0,10)]
+    fdf=pd.concat(results)
     fgdf=filegroupAnalysis(fdf,fgdf)
     PvRdf=get_textExtract(fgdf,fdf,kdf)
+    print(fdf)
+#     ##############
+#     ###Savepydblite  fdf fgdf with path and date 
+#     ##############
+#     ##fdf fgdf
 
-    ##############
-    ###Savepydblite  fdf fgdf with path and date 
-    ##############
-    ##fdf fgdf
+#     pyDbLite_db = PyDbLite().pyDbLite_db
+#     pyDb_id = pyDbLite_db.insert(file_filegroup = {'path':pdf_dir_root,'file':fdf,'filegroup_result':PvRdf})
+#     pyDbLite_db.commit()
+#     ##resultdf
 
-    pyDbLite_db = PyDbLite().pyDbLite_db
-    pyDb_id = pyDbLite_db.insert(file_filegroup={'path':pdf_dir_root,'file':fdf,'filegroup_result':PvRdf})
-    pyDbLite_db.commit()
-    ##resultdf
-
-    # pyDbLite_db = PyDbLite().pyDbLite_db
-    data=pyDbLite_db[1]
-    if not (data['result_df'] is None):
-        data['result_df'].append(PvRdf)
-        pyDb_id = pyDbLite_db.update(data,result_df=PvRdf)
-    else:
-        pyDb_id = pyDbLite_db.update(data,result_df=PvRdf)
-    pyDbLite_db.commit()
-#instertpydblite 1)with path and date 2) append to overall
-    writer = pd.ExcelWriter(PDF_DIR+'/'+str(time.time())+'File_Details.xlsx', engine='openpyxl')
-    fdf[['filename','filegroup','filetype','keywords']].to_excel(writer,'Sheet1')
-    writer.save()
-    writer = pd.ExcelWriter(PDF_DIR+'/'+str(time.time())+'File_Group_Result.xlsx', engine='openpyxl')
-    PvRdf.to_excel(writer,'Sheet1')
-    writer.save()
+#     # pyDbLite_db = PyDbLite().pyDbLite_db
+#     data=pyDbLite_db[1]
+#     if not (data['result_df'] is None):
+#         data['result_df'].append(PvRdf)
+#         pyDb_id = pyDbLite_db.update(data,result_df=PvRdf)
+#     else:
+#         pyDb_id = pyDbLite_db.update(data,result_df=PvRdf)
+#     pyDbLite_db.commit()
+# #instertpydblite 1)with path and date 2) append to overall
+#     writer = pd.ExcelWriter(PDF_DIR+'/'+str(time.time())+'File_Details.xlsx', engine='openpyxl')
+#     fdf[['filename','filegroup','filetype','keywords']].to_excel(writer,'Sheet1')
+#     writer.save()
+#     writer = pd.ExcelWriter(PDF_DIR+'/'+str(time.time())+'File_Group_Result.xlsx', engine='openpyxl')
+#     PvRdf.to_excel(writer,'Sheet1')
+#     writer.save()
     return PvRdf
 
 pyDbLite_db = PyDbLite().pyDbLite_db
 
-read_pdf_n_insert("/home/thrymr/Racmo/processed/Test")
+
+if __name__ == '__main__': 
+    read_pdf_n_insert("/home/thrymr/Racmo/processed/Test")
+

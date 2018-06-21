@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-
+from collections import OrderedDict
 class Models(object):
 
     def __init__(self, app):
@@ -52,8 +52,8 @@ class Models(object):
 
             decision_type = db.Column(db.Text, nullable=False)
             keyword_list = db.Column(db.Text, nullable=False)
-            bios = db.Column(db.Integer, db.ForeignKey("file_class.id"), nullable=True)
-            bios_map = db.relationship("FileClass", lazy="joined", foreign_keys=[bios])
+            bias = db.Column(db.Integer, db.ForeignKey("file_class.id"), nullable=True)
+            bias_map = db.relationship("FileClass", lazy="joined", foreign_keys=[bias])
 
         class FileGroup(db.Model):
             __tablename__ = 'file_group'
@@ -71,6 +71,7 @@ class Models(object):
                                          backref=db.backref("file_info", cascade="all, delete-orphan"))
             file_data_id = db.Column(db.Text, nullable=False)
             file_name = db.Column(db.Text, nullable=False)
+        db.create_all()
 
         if not FileType.query.filter(FileType.type == 'NOTIFICATION').first():
             new_type = FileType(type='NOTIFICATION')
@@ -98,18 +99,17 @@ class Models(object):
             db.session.add(new_type)
             db.session.commit()
         #enum fileclass
-        fclass={'N1':'ADMISSION','N2':'TRANSFER OF LEGAL REPRESENTATION PERMITTED',
-           'N3':'ENFORCEMENT ORDERS','N4':'STATEMENT OF PAYMENT',
-           'N5':'REJECTED CLAIMS','N6':'REJECTED TRANSFER OF LEGAL REPRESENTATION',
-           'N7':'HEARING','N8':'ASSET INQUIRY',
-           'N9':'PLACE OF RESIDENCY REQUIRED',
-           'N10':'REQUIREMENT'}
+        fclass=OrderedDict([('N1','ADMISSION'),('N2','TRANSFER OF LEGAL REPRESENTATION PERMITTED'),
+           ('N3','ENFORCEMENT ORDERS'),('N4','STATEMENT OF PAYMENT'),
+           ('N5','REJECTED CLAIMS'),('N6','REJECTED TRANSFER OF LEGAL REPRESENTATION'),
+           ('N7','HEARING'),('N8','ASSET INQUIRY'),
+           ('N9','PLACE OF RESIDENCY REQUIRED'),
+           ('N10','REQUIREMENT'),('N11','BANK TRANSFERS')])
         for k,v in fclass.items():
             if not Purpose.query.filter(FileClass.file_class_name == k).first():
                 new_type = FileClass(file_class_name=k,decision=v)
                 db.session.add(new_type)
                 db.session.commit()
 
-        db.create_all()
 
         return User, FileType, Purpose, FileClass, Keyword, FileGroup, FileInfo

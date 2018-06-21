@@ -104,7 +104,7 @@ class Models(object):
            ('N5','REJECTED CLAIMS'),('N6','REJECTED TRANSFER OF LEGAL REPRESENTATION'),
            ('N7','HEARING'),('N8','ASSET INQUIRY'),
            ('N9','PLACE OF RESIDENCY REQUIRED'),
-           ('N10','REQUIREMENT')])
+           ('N10','REQUIREMENT'),('N11','BANK TRANSFERS')])
         for k,v in fclass.items():
             if not Purpose.query.filter(FileClass.file_class_name == k).first():
                 new_type = FileClass(file_class_name=k,decision=v)
