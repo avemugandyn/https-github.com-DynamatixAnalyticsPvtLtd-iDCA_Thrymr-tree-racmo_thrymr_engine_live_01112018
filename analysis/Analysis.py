@@ -745,11 +745,15 @@ class Document_Analysis:
         fgdf=Document_Analysis.extract_data_from_filegroups(fdf,kdf)
         engine = create_engine(ConfigClass.SQLALCHEMY_DATABASE_URI)
         session = Document_Analysis.loadSession(engine)
-        max_v = model.db.session.query(model.db.func.max(model.FileGroup.batch_id)).scalar()
+        max_v = model.db.session.query(model.db.func.max(model.ProccessLog.batch_id)).scalar()
         if max_v==None:
             newmax=1
         else:
             newmax=max_v+1
+        proccess_log = model.ProccessLog( batch_id=newmax,
+                                        created_on = datetime.datetime.now())
+        model.db.session.add(proccess_log)
+        model.db.session.commit()
         for i , rr in fgdf.iterrows():
             kk = model.FileGroup(file_group = rr['filegroup'],
                                            court = rr['Court'],

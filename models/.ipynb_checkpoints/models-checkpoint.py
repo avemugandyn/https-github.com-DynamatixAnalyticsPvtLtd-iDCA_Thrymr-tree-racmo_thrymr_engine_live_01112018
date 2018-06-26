@@ -7,7 +7,7 @@ class Models(object):
         self.app = app
         self.db = SQLAlchemy(app)
         self.FileClass, self.Keyword, \
-        self.FileClassificationResult, self.SuspendKeywords, self.FileGroup = self.model_classes(self.db)
+        self.FileClassificationResult, self.SuspendKeywords, self.FileGroup, self.ProccessLog = self.model_classes(self.db)
 
     @staticmethod
     def model_classes(db):
@@ -64,6 +64,12 @@ class Models(object):
             debtor = db.Column(db.Text, nullable=True)
             batch_id = db.Column(db.Integer, nullable = False)
             created_on = db.Column(db.Date, nullable = False)
+            
+        class ProccessLog(db.Model):
+            __tablename__ = 'proccess_log'
+            id = db.Column(db.Integer, primary_key=True)
+            batch_id = db.Column(db.Integer, nullable = False)
+            created_on = db.Column(db.Date, nullable = False)
 
         db.create_all()
 
@@ -81,6 +87,6 @@ class Models(object):
             db.session.add(new_type)
             db.session.commit()
 
-        return  FileClass, Keyword, FileClassificationResult, SuspendKeywords, FileGroup
+        return  FileClass, Keyword, FileClassificationResult, SuspendKeywords, FileGroup, ProccessLog
 
     
