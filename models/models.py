@@ -6,8 +6,8 @@ class Models(object):
     def __init__(self, app):
         self.app = app
         self.db = SQLAlchemy(app)
-        self.FileClass, self.Keyword, self.UserDetails,\
-        self.FileClassificationResult, self.SuspendKeywords, self.FileGroup= self.model_classes(self.db)
+        self.FileClass, self.Keyword, \
+        self.FileClassificationResult, self.SuspendKeywords, self.FileGroup = self.model_classes(self.db)
 
     @staticmethod
     def model_classes(db):
@@ -45,6 +45,8 @@ class Models(object):
             file_type = db.Column(db.Text, nullable=True)
             file_group = db.Column(db.Text, nullable=True)
             predicted_classes = db.Column(db.Text, nullable=True)
+            batch_id = db.Column(db.Integer, nullable = False)
+            created_on = db.Column(db.Date, nullable = False)
 
         class FileGroup(db.Model):
             __tablename__= 'filegroup_extraction'
@@ -60,13 +62,8 @@ class Models(object):
             amount = db.Column(db.Text, nullable=True)
             date_of_hearing = db.Column(db.Text, nullable=True)
             debtor = db.Column(db.Text, nullable=True)
-        
-        class UserDetails(db.Model):
-            __tablename__='user_details'
-            id = db.Column(db.Integer, primary_key=True)
-            name = db.Column(db.Text, nullable=True)
-            new_folder = db.Column(db.Text, nullable=True)
-            archive_folder = db.Column(db.Text, nullable=True)
+            batch_id = db.Column(db.Integer, nullable = False)
+            created_on = db.Column(db.Date, nullable = False)
 
         db.create_all()
 
@@ -83,12 +80,7 @@ class Models(object):
             new_type = FileClass(file_class_name=k,decision=v)
             db.session.add(new_type)
             db.session.commit()
-        
-        if not UserDetails.query.filter(UserDetails.name == 'Testuser').first():
-            new_user = UserDetails(name='Testuser',
-                               new_folder='/home/thrymr/Notifications/test_user/new',
-                               archive_folder='/home/thrymr/Notifications/test_user/archived')
-            db.session.add(new_user)
-            db.session.commit()
 
-        return  FileClass, Keyword, UserDetails, FileClassificationResult, SuspendKeywords, FileGroup
+        return  FileClass, Keyword, FileClassificationResult, SuspendKeywords, FileGroup
+
+    

@@ -1,3 +1,4 @@
+
 from configuration.configuration import ConfigClass
 import pickle
 import pymysql
@@ -46,20 +47,20 @@ def create_link_between_keyword(kdf):
 
 
 def insert_record_in_keyword():
-    with open('../flask/Keyword_Analysis_Testing.pickle', 'rb') as handle:
+    with open('Keyword.pickle', 'rb') as handle:
         b=pickle.load(handle,encoding='latin1')
        
     kxddf=b['keywords']
     suspkdf=b['susKeyword']
     # # copy1 postgres copy2 pydblite
-    print(kxddf.columns)
+    print(kxddf)
     for i,r in kxddf.iterrows():
         
         k = Keywords(file_class =r['fileclass'], file_type =r['filetype'], purpose=r['purpose'],
                      decision_type=r['decision_type'], keyword=json.dumps(r['keyword']),bias=r['bias'])
-        # session.add(k)
-        # session.commit()
-    print(len(suspkdf),suspkdf)
+        session.add(k)
+        session.commit()
+    # print(len(suspkdf),suspkdf)
     for j,sr in suspkdf.iterrows():
         Sk = SuspendKeywords(file_class=sr['file_class'], file_type=sr['file_type'],
              keyword=json.dumps(sr['keyword']),remove_class=sr['remove_class'])
@@ -70,6 +71,6 @@ def insert_record_in_keyword():
             
 if __name__ == '__main__':
     kdf = insert_record_in_keyword()
-    # create_link_between_keyword(kdf)
+    create_link_between_keyword(kdf)
 
     

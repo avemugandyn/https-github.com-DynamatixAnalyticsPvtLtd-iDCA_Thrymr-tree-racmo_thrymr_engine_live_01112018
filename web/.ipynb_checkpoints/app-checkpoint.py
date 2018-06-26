@@ -15,82 +15,28 @@ def create_app(test_config=None):
     app.config.from_object(ConfigClass)
     model = Models(app)
     
-    @app.route("/api/save-user-details",methods=['POST'])
-    def seveUserDetails():
-        data = request.get_json()
-        if data != None:
-            try:
-                username = data['username']
-            except Exception as e:
-                resp = jsonify({"MissingParameterError": " 'username' "})
-                resp.status_code = 400
-                return resp
-            try:
-                new_folder = data['new_folder_location']
-            except Exception as e:
-                resp = jsonify({"MissingParameterError": " 'New folder location for user' "})
-                resp.status_code = 400
-                return resp
-            try:
-                archive_folder = data['archive_folder_location']
-            except Exception as e:
-                resp = jsonify({"MissingParameterError": " 'Archive folder location for user' "})
-                resp.status_code = 400
-                return resp
-        
-            if not model.UserDetails.query.filter(model.UserDetails.name == username).first():
-                new_user = model.UserDetails(name=username,
-                                       new_folder=new_folder,
-                                       archive_folder=archive_folder)
-                model.db.session.add(new_user)
-                model.db.session.commit()
-                
-                return jsonify("Successfully Save record ")
-            else:
-                resp = jsonify({"Error": " 'User already there !!' "})
-                resp.status_code = 400
-                return resp
-        else:
-            resp = jsonify({"Error": " 'Please send required data !!' "})
-            resp.status_code = 400
-            return resp
-    
-    @app.route("/api/run-analysis",methods=['POST'])
+    @app.route("/api/run-analysis",methods=['GET'])
     def runAnalysis():
-        data = request.get_json()
-        if data != None:
-            try:
-                username = data['username']
-            except Exception as e:
-                resp = jsonify({"MissingParameterError": " 'username' "})
-                resp.status_code = 400
-                return resp
-            user = model.UserDetails.query.filter(model.UserDetails.name == username).first()
-            if user is not None:
-                new_folder_location = user.new_folder
-                archive_folder_location = user.archive_folder
-                #set analysis function here and pass folder-path
-                print(new_folder_location,archive_folder_location)
-                ######
-                try:
-                    Document_Analysis.read_pdf_n_insert(new_folder_location,archive_folder_location,model)
-                    return jsonify("Successfully Save record ")
-                except Exception as e:
-                    return jsonify(" Some thing went wrong ")
-                ######
-            else:
-                resp = jsonify({"Error": " 'User not there !!' "})
-                resp.status_code = 400
-                return resp
-        else:
-            resp = jsonify({"Error": " 'Please send required data !!' "})
+        new_folder_location = ConfigClass.NEW_FOLDER
+        archive_folder_location = ConfigClass.ARCHIVE_FOLDER
+        #set analysis function here and pass folder-path
+        print(new_folder_location,archive_folder_location)
+        Document_Analysis.read_pdf_n_insert(new_folder_location,archive_folder_location,model)
+
+        try:
+            return jsonify("Successfully Save record ")
+        except Exception as e:
+            resp = jsonify({"Error": " 'User not there !!' "})
             resp.status_code = 400
             return resp
         
-        
-    
     @app.route('/')
     def index():
+        max_v = model.db.session.query(model.db.func.max(model.FileGroup.batch_id)).scalar()
+        print("max_v",max_v)
+        users = model.FileGroup.query.filter(model.FileGroup.batch_id == max_v).first()
+        print(users)
+        
         return "Hello RACMO"
     
     CORS(app, resources=r'/api/*', headers='Content-Type')

@@ -25,6 +25,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from configuration.configuration import ConfigClass,DbConf
 import shutil
+import datetime
 
 class Document_Analysis:
     def loadSession(engine):
@@ -34,7 +35,7 @@ class Document_Analysis:
         session = Session()
         return session
 
-
+# SELECT max(batch_id) FROM file_classification;
     def keywordimport():
         engine = create_engine(ConfigClass.SQLALCHEMY_DATABASE_URI)
         session = Document_Analysis.loadSession(engine)
@@ -187,9 +188,9 @@ class Document_Analysis:
     def parse_other(pf):
         text=""
         try:
-            newtext =unicode(textract.process(pf),'utf-8')
+            newtext =str(textract.process(pf),'utf-8')
             if(len(newtext.split())==0):
-                newtext =unicode(textract.process(pf,method='tesseract'),'utf-8')
+                newtext =str(textract.process(pf,method='tesseract'),'utf-8')
             newtext=(''.join((c for c in unicodedata.normalize('NFD', newtext) if unicodedata.category(c) != 'Mn'))).lower()
             rem=''
             paratlist=['MODO DE IMPUGNACION:'.lower(),'mode d\'impugnacio',
@@ -229,18 +230,22 @@ class Document_Analysis:
                     fdf.loc[fdf['filename'].str.contains(fl),'filetype']="NOTIFICATION"
         return fdf,fgdf
 
-    def get_predclass(kdf,row,j,text,fdf):
+    def get_predclass_normal(kdf,row,j,text,fdf):
         bias=row['bias']
+        print(row)
         if len(row['sub'])>0:
     #         if row['fileclass']=='N16':
     #         if bias=='N1':
+    #              print(bias,filename,keyword)
             for i, kr in kdf[(kdf['id'].isin(row['sub']))].iterrows():
                 f=True
                 for k in kr['keyword']:
                     if not (''.join(unidecode.unidecode(k).split()).lower() in text):
                         f=False
                 if f:
-                    bias1=Document_Analysis.get_predclass(kdf,kr,j,text,fdf)
+
+                    bias1=Document_Analysis.get_predclass_normal(kdf,kr,j,text,fdf)
+    #                 print(bias,bias1,filename,keyword,k)
                     bias=bias1
                     if kr['fileclass'] in fdf.loc[j,'keywords'].keys():
                         fdf.loc[j,'keywords'][kr['fileclass']].append(kr['keyword'])
@@ -248,49 +253,129 @@ class Document_Analysis:
                         fdf.loc[j,'keywords'][kr['fileclass']]=list()
                         fdf.loc[j,'keywords'][kr['fileclass']].append(kr['keyword'])
         return bias
-    
+    def get_predclass_fuzzy(kdf,row,j,text,fdf):
+        bias=row['bias']
+        if len(row['sub'])>0:
+            for i, kr in kdf[(kdf['id'].isin(row['sub']))].iterrows():
+                f=True
+                for k in kr['keyword']:
+                    try:
+                        match=find_near_matches(''.join(unidecode.unidecode(k).split()).lower(), text, max_l_dist=1)
+                    except Exception as e:
+                        f=False
+                    if len(match)==0:
+                        f=False
+                if f:
+
+                    bias1=Document_Analysis.get_predclass_normal(kdf,kr,j,text,fdf)
+    #                 print(bias,bias1,filename,keyword,k)
+                    bias=bias1
+                    if kr['fileclass'] in fdf.loc[j,'keywords'].keys():
+                        fdf.loc[j,'keywords'][kr['fileclass']].append(kr['keyword'])
+                    else:
+                        fdf.loc[j,'keywords'][kr['fileclass']]=list()
+                        fdf.loc[j,'keywords'][kr['fileclass']].append(kr['keyword'])
+        return bias
+
     def get_classify_result(fdf,kdf,suspkdf,notification_corelation_dict):
-        kdf["document_list"]=np.empty((len(kdf), 0)).tolist()
         fdf["keywords"]=fdf["filename"].apply(lambda x:{})
         fdf["pred_class"]=fdf["filename"].apply(lambda x:list())
         fdf["final_categ"]=fdf["filename"].apply(lambda x:list())
         fdf.loc[fdf['filetype']=='TICKET','text_response']=fdf['table_response']
         classlis=[]
         for j,row in fdf.iterrows():
+            if row['filetype']=='TICKET':
+                text=str(''.join(unidecode.unidecode(row['text_response']).split()).lower())
+            else:
+                text=str(''.join(row['text_response'].split()))
+
             for i,kdrow in kdf.iterrows():
-                text=''.join(row['text_response'].split())
-                if row['text_response'][:5]!='Error':
+    #         #       
+                if text[:5]!='Error':
+
                     f=True
+                
                     for k in kdrow['keyword']:
-                        if not (''.join(unidecode.unidecode(k).split()).lower() in text):
+                        if(kdrow['fileclass']=='N2' and k=='sucesion procesal'):
+                                print(kdrow)
+                        if not (str(''.join(unidecode.unidecode(k).split()).lower()) in text):
+                            
                             f=False
-                    if f and (kdrow['filetype']==row['filetype'] or(kdrow['filetype']=='NOTIFICATION' and \
-                                                                    row['filetype']=='OTHER') ) and (kdrow['purpose']=='CLASSIFICATION'):
-                        fdf.loc[j,'pred_class'].append(Document_Analysis.get_predclass(kdf,kdrow,j,text,fdf))
+                    if f and (kdrow['filetype']==row['filetype'] or(kdrow['filetype']=='NOTIFICATION' and row['filetype']=='OTHER') )and (kdrow['purpose']=='CLASSIFICATION'):
+                        
+                        fdf.loc[j,'pred_class'].append(Document_Analysis.get_predclass_normal(kdf,kdrow,j,text,fdf))
                         if kdrow['fileclass'] in fdf.loc[j,'keywords'].keys():
                             fdf.loc[j,'keywords'][kdrow['fileclass']].append(kdrow['keyword'])
                         else:
                             fdf.loc[j,'keywords'][kdrow['fileclass']]=list()
                             fdf.loc[j,'keywords'][kdrow['fileclass']].append(kdrow['keyword'])
-                            classlis.append(kdrow['fileclass'])
+
+            if not bool(fdf.loc[j,'keywords']):
+                for i,kdrow in kdf.iterrows():
+                    if text[:5]!='Error':
+
+                        f=False
+                        if(kdrow['filetype']==row['filetype'] or(kdrow['filetype']=='NOTIFICATION' and row['filetype']=='OTHER') )and (kdrow['purpose']=='CLASSIFICATION'):
+                            f=True
+                            for k in kdrow['keyword']:
+                                match=[]
+                                try:
+                                    match=find_near_matches(''.join(unidecode.unidecode(k).split()).lower(), text, max_l_dist=1)
+                                except Exception as e:
+                                    f=False
+                                if len(match)==0:
+                                    f=False
+
+                        if f:
+                            fdf.loc[j,'pred_class'].append(Document_Analysis.get_predclass_fuzzy(kdf,kdrow,j,text,fdf))
+                            if kdrow['fileclass'] in fdf.loc[j,'keywords'].keys():
+                                fdf.loc[j,'keywords'][kdrow['fileclass']].append(kdrow['keyword'])
+                            else:
+                                fdf.loc[j,'keywords'][kdrow['fileclass']]=list()
+                                fdf.loc[j,'keywords'][kdrow['fileclass']].append(kdrow['keyword'])
             fdf.set_value(j,'pred_class',list(set(fdf.loc[j,'pred_class'])))
             for si,sr in suspkdf.iterrows():
                     f=True
                     for k in sr['keyword']:
+
                         if not (''.join(unidecode.unidecode(k).split()).lower() in ''.join(row['text_response'].split() )):
                             f=False
                     if f and (row['filetype']=='NOTIFICATION' or row['filetype']=='OTHER'):
                         if sr['remove_class'] in row['pred_class']:
+                            if kdrow['fileclass'] in fdf.loc[j,'keywords'].keys():
+                                fdf.loc[j,'keywords']['NX-'+sr['remove_class']].append(sr['keyword'])
+                            else:
+                                fdf.loc[j,'keywords']['NX-'+sr['remove_class']]=list()
+                                fdf.loc[j,'keywords']['NX-'+sr['remove_class']].append(sr['keyword'])
                             fdf.loc[j,'pred_class'].remove(sr['remove_class'])
-                    f=True
+            f1=True
+            print(row['pred_class'],fdf)
             for k in list(row['pred_class']): 
                 s=set(notification_corelation_dict[k])
                 if not(set(row['pred_class'])<=(s) and set([k])<=set(row['pred_class'])):
-                    f=False
-            if f:
-                fdf.set_value(j,'final_categ',list(set(fdf.loc[j,'pred_class'])))
-        return fdf
 
+                    f1=False
+            if f1:
+                fdf.set_value(j,'final_categ',list(set(fdf.loc[j,'pred_class'])))
+        fgs=fdf.groupby('filegroup')
+        for k,v in fgs.groups.items():
+            f=False
+            otherclass="N16"
+            for ind in v:
+                if 'N16' in fdf.loc[ind,'final_categ']:
+                    f=True
+                if 'N8' in fdf.loc[ind,'final_categ']:
+                    otherclass='N8'
+                elif 'N15' in fdf.loc[ind,'final_categ']:
+                    otherclass='N15'
+            for ind in v:
+                if f:
+                    for n, i in enumerate(fdf.loc[ind,'final_categ']):
+                        if i == 'N16':
+                            fdf.loc[ind,'final_categ'][n] = otherclass
+
+
+        return fdf
     def filegroupAnalysis(ddf,fgdf):
         fgs = ddf.groupby('filegroup')
         i=0
@@ -572,6 +657,7 @@ class Document_Analysis:
 
     def read_pdf_n_insert(root_new,root_archive,model):
         PDF_DIR = root_new
+        print("hii",root_new)
         pdf_files = [f for f in listdir(PDF_DIR)\
                      if isfile(join(PDF_DIR,  f)) ]
         ls=list()
@@ -659,6 +745,11 @@ class Document_Analysis:
         fgdf=Document_Analysis.extract_data_from_filegroups(fdf,kdf)
         engine = create_engine(ConfigClass.SQLALCHEMY_DATABASE_URI)
         session = Document_Analysis.loadSession(engine)
+        max_v = model.db.session.query(model.db.func.max(model.FileGroup.batch_id)).scalar()
+        if max_v==None:
+            newmax=1
+        else:
+            newmax=max_v+1
         for i , rr in fgdf.iterrows():
             kk = model.FileGroup(file_group = rr['filegroup'],
                                            court = rr['Court'],
@@ -670,16 +761,20 @@ class Document_Analysis:
                                            auto = rr['Auto'],
                                            amount = rr['Amount'],
                                            date_of_hearing =rr['Date_of_hearing'],
-                                           debtor = rr['Debtor'])
+                                           debtor = rr['Debtor'],
+                                           batch_id=newmax,
+                                           created_on = datetime.datetime.now())
             model.db.session.add(kk)
             model.db.session.commit()
         for i , r in fdf.iterrows():
             k = model.FileClassificationResult(file_name =r['filename'],
                                          file_group =r['filegroup'],
                                          file_type=r['filetype'],
-                                         predicted_classes=json.dumps(r['final_categ']))
+                                         predicted_classes=json.dumps(r['final_categ']),
+                                         batch_id=newmax,
+                                         created_on = datetime.datetime.now())
             model.db.session.add(k)
             model.db.session.commit()
-            shutil.move(join(PDF_DIR,r.filename),join(root_archive,r.filename))
+            shutil.move(join( PDF_DIR,r.filename),join(root_archive,r.filename))
         
         return fgdf
