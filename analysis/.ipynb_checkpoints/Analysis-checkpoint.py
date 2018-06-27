@@ -660,125 +660,139 @@ class Document_Analysis:
         print("hii",root_new)
         pdf_files = [f for f in listdir(PDF_DIR)\
                      if isfile(join(PDF_DIR,  f)) ]
-        ls=list()
-        for pdf_file in pdf_files:
-            ls.append(pdf_file.split('_'))
-        df=pd.DataFrame(ls)
-        df = df[pd.notnull(df[3])]
-        fg=list(df.groupby(3))
-        ls=[]
-        i=0
-        flist=list()
-        for k,gdf in  fg:
-            fglist=[]
-            elist=[]
-            for i, row in gdf.iterrows():
-                row=row.dropna()
-                fln='_'.join(list(row))
-                flist.append(fln)
-                elist.append(fln[-3:].lower())
-            fgroup={'group':k,'files':flist,'length':len(flist),'min_filename':min(flist, key=len),'extensions':elist}
-            ls.append(fgroup)
-        flgdf=pd.DataFrame(ls)
-        flgdf=flgdf.dropna(thresh=1,axis=1)
-        fdf = Document_Analysis.get_structured_files_dataframe(flgdf)
-        fdf=fdf.rename(columns={"file":"filename","group":"filegroup","type":"filetype"})
+        if len(pdf_files)>0:
+            ls=list()
+            for pdf_file in pdf_files:
+                ls.append(pdf_file.split('_'))
+            df=pd.DataFrame(ls)
+            df = df[pd.notnull(df[3])]
+            fg=list(df.groupby(3))
+            ls=[]
+            i=0
+            flist=list()
+            for k,gdf in  fg:
+                fglist=[]
+                elist=[]
+                for i, row in gdf.iterrows():
+                    row=row.dropna()
+                    fln='_'.join(list(row))
+                    flist.append(fln)
+                    elist.append(fln[-3:].lower())
+                fgroup={'group':k,'files':flist,'length':len(flist),'min_filename':min(flist, key=len),'extensions':elist}
+                ls.append(fgroup)
+            flgdf=pd.DataFrame(ls)
+            flgdf=flgdf.dropna(thresh=1,axis=1)
+            fdf = Document_Analysis.get_structured_files_dataframe(flgdf)
+            fdf=fdf.rename(columns={"file":"filename","group":"filegroup","type":"filetype"})
 
-        for i, r in fdf.iterrows():
-            ticresponse=""
-            textresponse=""
-            try:
-                ticresponse=Document_Analysis.parse_ticket(join(PDF_DIR,r.filename))
-            except Exception as e:
-                ticresponse='Error:'+str(e)
-            try:
-                if r.filename[-3:].lower()!='zip':
-                    if r.filetype=='TICKET':
-                            textresponse=ticresponse
+            for i, r in fdf.iterrows():
+                ticresponse=""
+                textresponse=""
+                try:
+                    ticresponse=Document_Analysis.parse_ticket(join(PDF_DIR,r.filename))
+                except Exception as e:
+                    ticresponse='Error:'+str(e)
+                try:
+                    if r.filename[-3:].lower()!='zip':
+                        if r.filetype=='TICKET':
+                                textresponse=ticresponse
+                        else:
+                            textresponse=Document_Analysis.parse_other(join(PDF_DIR,r.filename))
                     else:
-                        textresponse=Document_Analysis.parse_other(join(PDF_DIR,r.filename))
-                else:
-                    textresponse=""
-                    with zipfile.ZipFile(join(PDF_DIR,r.filename)) as z:
-                        for fileinzip in z.namelist():
+                        textresponse=""
+                        with zipfile.ZipFile(join(PDF_DIR,r.filename)) as z:
+                            for fileinzip in z.namelist():
 
-                            if not os.path.isdir(fileinzip):
-                                # read the file
-                                zfdir=join(PDF_DIR, os.path.basename(fileinzip))
-                                with z.open(fileinzip) as fz,open(zfdir, 'wb') as zfp:
-                                            shutil.copyfileobj(fz, zfp)
-                                            text=parse_other(join(PDF_DIR,zfdir))
-                                            if text[:5]!='Error':
-                                                textresponse+=text
-                                            os.remove(zfdir)
+                                if not os.path.isdir(fileinzip):
+                                    # read the file
+                                    zfdir=join(PDF_DIR, os.path.basename(fileinzip))
+                                    with z.open(fileinzip) as fz,open(zfdir, 'wb') as zfp:
+                                                shutil.copyfileobj(fz, zfp)
+                                                text=parse_other(join(PDF_DIR,zfdir))
+                                                if text[:5]!='Error':
+                                                    textresponse+=text
+                                                os.remove(zfdir)
 
-            except Exception as e:
-                textresponse='Error:'+str(e)
-            fdf.loc[i,"table_response"] = ticresponse
-            fdf.loc[i,"text_response"] = textresponse
-        fdf,fgdf=Document_Analysis.update_filetype(fdf)
-        ############
-        #mongoupdate here
-        ############
-        
-        #######
-        notification_corelation_dict = { 'N1' : {'N1','N4','N7','N11','N13'},
-                   'N2' : {'N2','N4','N7','N8','N11','N13','N15','N16'},
-                   'N3' : {'N3','N4','N7','N8','N11','N13','N15','N16'},
-                   'N4' : {'N1','N2','N3','N4','N7','N8','N9','N10','N13','N14','N15','N16'},
-                   'N5' : {'N5'},
-                   'N6' : {'N6'},
-                   'N7' : {'N1','N2','N3','N4','N7','N11'},
-                   'N8' : {'N2','N3','N4','N8','N9','N10','N11'},
-                   'N9' : {'N4','N8','N9','N10','N11','N13','N15','N16'},
-                   'N10' : {'N4','N8','N9','N10','N11','N12','N13','N15','N16'},
-                   'N11' : {'N1','N2','N3','N7','N8','N9','N10','N11','N13','N14','N15','N15'},
-                   'N12' : {'N12'},
-                   'N13' : {'N1','N2','N3','N4','N9','N10','N11','N13'},
-                   'N14' : {'N4','N11','N14'},
-                   'N15' : {'N2','N3','N4','N9','N10','N11','N15'},
-                   'N16' : {'N2','N3','N4','N9','N10','N11','N16'}
-        } 
-        kdf,suspkdf=Document_Analysis.keywordimport() 
-        fdf=Document_Analysis.get_classify_result(fdf,kdf,suspkdf,notification_corelation_dict)
+                except Exception as e:
+                    textresponse='Error:'+str(e)
+                fdf.loc[i,"table_response"] = ticresponse
+                fdf.loc[i,"text_response"] = textresponse
+            fdf,fgdf=Document_Analysis.update_filetype(fdf)
+            ############
+            #mongoupdate here
+            ############
 
-        fgdf=Document_Analysis.extract_data_from_filegroups(fdf,kdf)
-        engine = create_engine(ConfigClass.SQLALCHEMY_DATABASE_URI)
-        session = Document_Analysis.loadSession(engine)
-        max_v = model.db.session.query(model.db.func.max(model.ProccessLog.batch_id)).scalar()
-        if max_v==None:
-            newmax=1
+            #######
+            notification_corelation_dict = { 'N1' : {'N1','N4','N7','N11','N13'},
+                       'N2' : {'N2','N4','N7','N8','N11','N13','N15','N16'},
+                       'N3' : {'N3','N4','N7','N8','N11','N13','N15','N16'},
+                       'N4' : {'N1','N2','N3','N4','N7','N8','N9','N10','N13','N14','N15','N16'},
+                       'N5' : {'N5'},
+                       'N6' : {'N6'},
+                       'N7' : {'N1','N2','N3','N4','N7','N11'},
+                       'N8' : {'N2','N3','N4','N8','N9','N10','N11'},
+                       'N9' : {'N4','N8','N9','N10','N11','N13','N15','N16'},
+                       'N10' : {'N4','N8','N9','N10','N11','N12','N13','N15','N16'},
+                       'N11' : {'N1','N2','N3','N7','N8','N9','N10','N11','N13','N14','N15','N15'},
+                       'N12' : {'N12'},
+                       'N13' : {'N1','N2','N3','N4','N9','N10','N11','N13'},
+                       'N14' : {'N4','N11','N14'},
+                       'N15' : {'N2','N3','N4','N9','N10','N11','N15'},
+                       'N16' : {'N2','N3','N4','N9','N10','N11','N16'}
+            } 
+            kdf,suspkdf=Document_Analysis.keywordimport() 
+            fdf=Document_Analysis.get_classify_result(fdf,kdf,suspkdf,notification_corelation_dict)
+
+            fgdf=Document_Analysis.extract_data_from_filegroups(fdf,kdf)
+            engine = create_engine(ConfigClass.SQLALCHEMY_DATABASE_URI)
+            session = Document_Analysis.loadSession(engine)
+            max_v = model.db.session.query(model.db.func.max(model.ProccessLog.batch_id)).scalar()
+            if max_v==None:
+                newmax=1
+            else:
+                newmax=max_v+1
+            proccess_log = model.ProccessLog( batch_id=newmax,
+                                            creation_date = datetime.datetime.now(),process_date=datetime.datetime.now())
+            model.db.session.add(proccess_log)
+            model.db.session.commit()
+            fgdf=fgdf.applymap(lambda x: None if x=='' else x)
+            for i , rr in fgdf.iterrows():
+                kk = model.FileGroup(file_group = rr['filegroup'],
+                                               court = rr['Court'],
+                                               court_initial = rr['Court'],
+                                               solicitor = rr['Solictor'],
+                                               solicitor_initial = rr['Solictor'],
+                                               procedure_type =rr['Procedure_Type'],
+                                               procedure_type_initial = rr['Procedure_Type'],
+                                               time_frame = rr['Time Frame'],
+                                               document_date_initial =rr['Document date'],
+                                               document_date = rr['Document date'],
+                                               stamp_date_initial =rr['Stamp date'], 
+                                               stamp_date = rr['Stamp date'],
+                                               auto =rr['Auto'],
+                                               auto_initial = rr['Auto'],
+                                               amount_initial =rr['Amount'], 
+                                               amount = rr['Amount'],
+                                               date_of_hearing_initial =rr['Date_of_hearing'], 
+                                               date_of_hearing =rr['Date_of_hearing'],
+                                               debtor_initial =rr['Debtor'], 
+                                               debtor = rr['Debtor'],
+                                               batch_id=newmax,
+                                               creation_date = datetime.datetime.now()
+                                    )
+                model.db.session.add(kk)
+                model.db.session.commit()
+            for i , r in fdf.iterrows():
+                k = model.FileClassificationResult(file_name =r['filename'],
+                                             file_group =r['filegroup'],
+                                             file_type=r['filetype'],
+                                             predicted_classes=json.dumps(r['final_categ']),
+                                             batch_id=newmax,
+                                             creation_date = datetime.datetime.now())
+                model.db.session.add(k)
+                model.db.session.commit()
+                shutil.move(join( PDF_DIR,r.filename),join(root_archive,r.filename))
+            return True
         else:
-            newmax=max_v+1
-        proccess_log = model.ProccessLog( batch_id=newmax,
-                                        created_on = datetime.datetime.now())
-        model.db.session.add(proccess_log)
-        model.db.session.commit()
-        for i , rr in fgdf.iterrows():
-            kk = model.FileGroup(file_group = rr['filegroup'],
-                                           court = rr['Court'],
-                                           solicitor = rr['Solictor'],
-                                           procedure_type = rr['Procedure_Type'],
-                                           time_frame = rr['Time Frame'],
-                                           document_date = rr['Document date'],
-                                           stamp_date = rr['Stamp date'],
-                                           auto = rr['Auto'],
-                                           amount = rr['Amount'],
-                                           date_of_hearing =rr['Date_of_hearing'],
-                                           debtor = rr['Debtor'],
-                                           batch_id=newmax,
-                                           created_on = datetime.datetime.now())
-            model.db.session.add(kk)
-            model.db.session.commit()
-        for i , r in fdf.iterrows():
-            k = model.FileClassificationResult(file_name =r['filename'],
-                                         file_group =r['filegroup'],
-                                         file_type=r['filetype'],
-                                         predicted_classes=json.dumps(r['final_categ']),
-                                         batch_id=newmax,
-                                         created_on = datetime.datetime.now())
-            model.db.session.add(k)
-            model.db.session.commit()
-            shutil.move(join( PDF_DIR,r.filename),join(root_archive,r.filename))
+            return False
         
-        return fgdf

@@ -26,7 +26,7 @@ def create_app(test_config=None):
         try:
             return jsonify("Successfully Save record ")
         except Exception as e:
-            resp = jsonify({"Error": " 'User not there !!' "})
+            resp = jsonify({"Error: Either NO files at the location or something went wrong "})
             resp.status_code = 400
             return resp
         
