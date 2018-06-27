@@ -21,12 +21,14 @@ def create_app(test_config=None):
         archive_folder_location = ConfigClass.ARCHIVE_FOLDER
         #set analysis function here and pass folder-path
         print(new_folder_location,archive_folder_location)
-        Document_Analysis.read_pdf_n_insert(new_folder_location,archive_folder_location,model)
-
+        
         try:
-            return jsonify("Successfully Save record ")
+            if Document_Analysis.read_pdf_n_insert(new_folder_location,archive_folder_location,model):
+                return jsonify("Successfully Save record ")
+            else:
+                return jsonify("No files in  the folder")
         except Exception as e:
-            resp = jsonify({"Error: Either NO files at the location or something went wrong "})
+            resp = jsonify({"Error:"+str(e) })
             resp.status_code = 400
             return resp
         

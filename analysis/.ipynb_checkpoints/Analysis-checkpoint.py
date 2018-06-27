@@ -756,6 +756,14 @@ class Document_Analysis:
             model.db.session.add(proccess_log)
             model.db.session.commit()
             fgdf=fgdf.applymap(lambda x: None if x=='' else x)
+            mdb = DbConf.mdb
+            fileData = DbConf.fileData
+            for i,mr in fdf.iterrows():
+                data = { "filename":mr['filename'],
+                "text_response": mr['text_response'],
+                "table_response": mr['table_response'],
+               }
+                fileData.insert_one(data)
             for i , rr in fgdf.iterrows():
                 kk = model.FileGroup(file_group = rr['filegroup'],
                                                court = rr['Court'],
