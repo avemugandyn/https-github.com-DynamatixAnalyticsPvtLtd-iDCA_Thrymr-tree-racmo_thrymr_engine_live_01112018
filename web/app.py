@@ -28,7 +28,7 @@ def create_app(test_config=None):
             else:
                 return jsonify("No files in  the folder")
         except Exception as e:
-            resp = jsonify({"Error:"+str(e) })
+            resp = jsonify({"Error":str(e) })
             resp.status_code = 400
             return resp
         

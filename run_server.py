@@ -2,4 +2,4 @@ from web.app import create_app
 
 app,model = create_app()
 if __name__ == '__main__':
-    app.run(port=1232, debug=False, host="0.0.0.0")
+    app.run(port=5000, debug=False, host="188.165.246.32")

@@ -26,19 +26,15 @@ from sqlalchemy.orm import sessionmaker
 from configuration.configuration import ConfigClass,DbConf
 import shutil
 import datetime
+import multiprocessing as mp
+import datefinder
 
 class Document_Analysis:
-    def loadSession(engine):
-        Base = declarative_base(engine)
-        metadata = Base.metadata
-        Session = sessionmaker(bind=engine)
-        session = Session()
-        return session
 
 # SELECT max(batch_id) FROM file_classification;
     def keywordimport():
         engine = create_engine(ConfigClass.SQLALCHEMY_DATABASE_URI)
-        session = Document_Analysis.loadSession(engine)
+        
         susp_df= pd.read_sql_query('SELECT k.id,k.file_class as fileclass,k.file_type as filetype,\
                                    k.keyword,k.remove_class FROM suspend_keywords k',engine)
         keyword_df= pd.read_sql_query('SELECT k.id,k.file_class as fileclass,k.file_type as filetype,k.purpose,\
@@ -48,12 +44,14 @@ class Document_Analysis:
 
         return keyword_df,susp_df
 
+    
     def get_pgnum(filename):
         pdf = pdfquery.PDFQuery(ConfigClass.UPLOAD_FOLDER + "/" + filename)
         pdf.load()
         pgn = len(pdf.tree.getroot().getchildren())
         return pgn
 
+    
     def get_structured_files_dataframe(df):
         tmp = pd.DataFrame(columns=["file","group"])
         j = 0
@@ -61,6 +59,7 @@ class Document_Analysis:
             for f in r.files:
                 tmp.loc[j] = [f, r.group]
                 j = j+1
+        print(len(tmp))
       # assert tmp.apply(lambda x:x.file.split("_")[3] == x.group, axis = 1).all()
         tmp["ext"] = tmp.apply(lambda x : x.file.split(".")[-1],axis =1)
         tmp["length"] = tmp.apply(lambda x : len(x.file),axis =1)
@@ -76,6 +75,7 @@ class Document_Analysis:
         tmp.loc[TI,"type"] = "TICKET"
         return tmp
 
+    
     def df_to_json(df):
         js = {}
         vals = df[0].values
@@ -123,10 +123,12 @@ class Document_Analysis:
         except Exception as e:
             return('Error:'+str(e))
 
+        
     def get_rtf_text(path):
         text = os.popen('unrtf --text '+path).read()
         return text
 
+    
     def parse_ticket(pdf_path):
         _JSON = {"filepath" : pdf_path}
         try:
@@ -182,9 +184,9 @@ class Document_Analysis:
             _JSON["table_2"] = df2.to_json(orient='index')
         except Exception as e:
                 return('Error:'+str(e))
-
         return json.dumps(_JSON, ensure_ascii=False)
 
+    
     def parse_other(pf):
         text=""
         try:
@@ -230,9 +232,9 @@ class Document_Analysis:
                     fdf.loc[fdf['filename'].str.contains(fl),'filetype']="NOTIFICATION"
         return fdf,fgdf
 
+    
     def get_predclass_normal(kdf,row,j,text,fdf):
         bias=row['bias']
-        print(row)
         if len(row['sub'])>0:
     #         if row['fileclass']=='N16':
     #         if bias=='N1':
@@ -253,6 +255,8 @@ class Document_Analysis:
                         fdf.loc[j,'keywords'][kr['fileclass']]=list()
                         fdf.loc[j,'keywords'][kr['fileclass']].append(kr['keyword'])
         return bias
+    
+    
     def get_predclass_fuzzy(kdf,row,j,text,fdf):
         bias=row['bias']
         if len(row['sub'])>0:
@@ -266,7 +270,6 @@ class Document_Analysis:
                     if len(match)==0:
                         f=False
                 if f:
-
                     bias1=Document_Analysis.get_predclass_normal(kdf,kr,j,text,fdf)
     #                 print(bias,bias1,filename,keyword,k)
                     bias=bias1
@@ -277,6 +280,7 @@ class Document_Analysis:
                         fdf.loc[j,'keywords'][kr['fileclass']].append(kr['keyword'])
         return bias
 
+    
     def get_classify_result(fdf,kdf,suspkdf,notification_corelation_dict):
         fdf["keywords"]=fdf["filename"].apply(lambda x:{})
         fdf["pred_class"]=fdf["filename"].apply(lambda x:list())
@@ -292,14 +296,10 @@ class Document_Analysis:
             for i,kdrow in kdf.iterrows():
     #         #       
                 if text[:5]!='Error':
-
                     f=True
-                
                     for k in kdrow['keyword']:
-                        if(kdrow['fileclass']=='N2' and k=='sucesion procesal'):
-                                print(kdrow)
-                        if not (str(''.join(unidecode.unidecode(k).split()).lower()) in text):
-                            
+                        
+                        if not (str(''.join(unidecode.unidecode(k).split()).lower()) in text):  
                             f=False
                     if f and (kdrow['filetype']==row['filetype'] or(kdrow['filetype']=='NOTIFICATION' and row['filetype']=='OTHER') )and (kdrow['purpose']=='CLASSIFICATION'):
                         
@@ -313,7 +313,6 @@ class Document_Analysis:
             if not bool(fdf.loc[j,'keywords']):
                 for i,kdrow in kdf.iterrows():
                     if text[:5]!='Error':
-
                         f=False
                         if(kdrow['filetype']==row['filetype'] or(kdrow['filetype']=='NOTIFICATION' and row['filetype']=='OTHER') )and (kdrow['purpose']=='CLASSIFICATION'):
                             f=True
@@ -325,7 +324,6 @@ class Document_Analysis:
                                     f=False
                                 if len(match)==0:
                                     f=False
-
                         if f:
                             fdf.loc[j,'pred_class'].append(Document_Analysis.get_predclass_fuzzy(kdf,kdrow,j,text,fdf))
                             if kdrow['fileclass'] in fdf.loc[j,'keywords'].keys():
@@ -337,11 +335,11 @@ class Document_Analysis:
             for si,sr in suspkdf.iterrows():
                     f=True
                     for k in sr['keyword']:
-
-                        if not (''.join(unidecode.unidecode(k).split()).lower() in ''.join(row['text_response'].split() )):
+                        if not (''.join(unidecode.unidecode(k).split()).lower() in ''.join(row['text_response'].split())):
                             f=False
                     if f and (row['filetype']=='NOTIFICATION' or row['filetype']=='OTHER'):
-                        if sr['remove_class'] in row['pred_class']:
+                        if sr['remove_class'] in fdf.loc[j,'pred_class']:
+                            print(row['filename'])
                             if kdrow['fileclass'] in fdf.loc[j,'keywords'].keys():
                                 fdf.loc[j,'keywords']['NX-'+sr['remove_class']].append(sr['keyword'])
                             else:
@@ -349,11 +347,9 @@ class Document_Analysis:
                                 fdf.loc[j,'keywords']['NX-'+sr['remove_class']].append(sr['keyword'])
                             fdf.loc[j,'pred_class'].remove(sr['remove_class'])
             f1=True
-            print(row['pred_class'],fdf)
             for k in list(row['pred_class']): 
                 s=set(notification_corelation_dict[k])
                 if not(set(row['pred_class'])<=(s) and set([k])<=set(row['pred_class'])):
-
                     f1=False
             if f1:
                 fdf.set_value(j,'final_categ',list(set(fdf.loc[j,'pred_class'])))
@@ -373,9 +369,9 @@ class Document_Analysis:
                     for n, i in enumerate(fdf.loc[ind,'final_categ']):
                         if i == 'N16':
                             fdf.loc[ind,'final_categ'][n] = otherclass
-
-
         return fdf
+    
+    
     def filegroupAnalysis(ddf,fgdf):
         fgs = ddf.groupby('filegroup')
         i=0
@@ -432,6 +428,8 @@ class Document_Analysis:
         numcat = {"1":"un","2":"dos","3":"tres","4":"quatre","5":"cinc","6":"sis","7":"set","8":"vuit","9":"nou",\
                 "10":"deu","11":"onze","12":"dotze","13":"tretze","14":"catorze","15":"quinze","16":"setze",\
                 "17" :"disset","18":"divuit","19":"dinou","20" : "vint"}
+        months={"enero": "January", "febrero":"February", "marzo": "March","abril": "April","mayo":"May","junio":"June","julio":"July","agosto":"August","septiembre":"September","octubre":"October","noviembre":"November", "diciembre":"December"}
+
         extKeywords = kdf[kdf['purpose']=='EXTRACTION']
         extKeywords['decision_type'] = extKeywords['decision_type'].apply(lambda x : x.split('-')[1])
         fgdf = pd.DataFrame(columns=['filegroup'])
@@ -462,6 +460,7 @@ class Document_Analysis:
         fgdf['Debtor']=''
         fgdf['Court']=''
         fgdf['Solictor']=''
+        fgdf['Procedure_Type']=''
         c=0
         for fi,fr in fgdf.iterrows():
             auto=""
@@ -518,7 +517,6 @@ class Document_Analysis:
                             k1=' '.join(kr['keyword'][0].split())    
                             if f :
                                 tex=' '.join(r['text_response'].split())
-
                                 fgdf.loc[fi,'Amount']=tex[tex.index(k1)+len(k1):].split()[0]
             if(('N9'in fr['predicted_classes'])or('N10'in fr['predicted_classes'])):
                     for i,r in fdf[(fdf['filename'].isin(fr['files']))&(fdf['filetype']=='NOTIFICATION')].iterrows():
@@ -554,9 +552,8 @@ class Document_Analysis:
                                         if int(num) < min:
                                             min=int(num)
                                 if min!=100:
+                                    
                                     fgdf.loc[fi,'Time Frame']=min
-
-
             for i,r in fdf[(fdf['filetype']=='TICKET')&(fdf['filename'].isin(fr['files']))].iterrows():
                     if r.table_response[:5]!='Error':
                         try:
@@ -605,7 +602,7 @@ class Document_Analysis:
                                 text=text.split("el proximo")[1]
                             else:
                                 text=text.split("el dia")[1]
-                            for k,v in months.iteritems():
+                            for k,v in months.items():
                                 text=text.replace(k,v)
                             f=True
                             matches=datefinder.find_dates(text)
@@ -615,6 +612,7 @@ class Document_Analysis:
             fgdf.loc[fi,'Auto']=auto
         return fgdf
 
+    
     def insert_mongo(pdf_path,filename):
         mdb = DbConf.mdb
         fileData = DbConf.fileData
@@ -623,7 +621,6 @@ class Document_Analysis:
         pdf_data = pdf_file.read()
         fs = GridFS(mdb)
         pdf_data = fs.put(pdf_data, filename=filename.split('.')[0])
-
         # read in the image.
         imgpath=join(ConfigClass.UPLOAD_FOLDER, filename)
     #     copyfile(pdf_path, imgpath)
@@ -653,39 +650,8 @@ class Document_Analysis:
                }
         mongo_id = fileData.insert_one(data)
         return mongo_id
-
-
-    def read_pdf_n_insert(root_new,root_archive,model):
-        PDF_DIR = root_new
-        print("hii",root_new)
-        pdf_files = [f for f in listdir(PDF_DIR)\
-                     if isfile(join(PDF_DIR,  f)) ]
-        if len(pdf_files)>0:
-            ls=list()
-            for pdf_file in pdf_files:
-                ls.append(pdf_file.split('_'))
-            df=pd.DataFrame(ls)
-            df = df[pd.notnull(df[3])]
-            fg=list(df.groupby(3))
-            ls=[]
-            i=0
-            flist=list()
-            for k,gdf in  fg:
-                fglist=[]
-                elist=[]
-                for i, row in gdf.iterrows():
-                    row=row.dropna()
-                    fln='_'.join(list(row))
-                    flist.append(fln)
-                    elist.append(fln[-3:].lower())
-                fgroup={'group':k,'files':flist,'length':len(flist),'min_filename':min(flist, key=len),'extensions':elist}
-                ls.append(fgroup)
-            flgdf=pd.DataFrame(ls)
-            flgdf=flgdf.dropna(thresh=1,axis=1)
-            fdf = Document_Analysis.get_structured_files_dataframe(flgdf)
-            fdf=fdf.rename(columns={"file":"filename","group":"filegroup","type":"filetype"})
-
-            for i, r in fdf.iterrows():
+    def parsefile(fdf,PDF_DIR,co):
+        for i, r in fdf.iterrows():
                 ticresponse=""
                 textresponse=""
                 try:
@@ -715,14 +681,54 @@ class Document_Analysis:
 
                 except Exception as e:
                     textresponse='Error:'+str(e)
+                # print(ticresponse)
                 fdf.loc[i,"table_response"] = ticresponse
                 fdf.loc[i,"text_response"] = textresponse
+        return fdf
+
+    def read_pdf_n_insert(root_new,root_archive,model):
+        PDF_DIR = root_new
+        print("hii",root_new)
+        pdf_files = [f for f in listdir(PDF_DIR)\
+                     if isfile(join(PDF_DIR,  f)) ]
+        if len(pdf_files)>0:
+            ls=list()
+            for pdf_file in pdf_files:
+                ls.append(pdf_file.split('_'))
+            df=pd.DataFrame(ls)
+            df = df[pd.notnull(df[3])]
+            fg=list(df.groupby(3))
+            ls=[]
+            i=0
+            for k,gdf in  fg:
+                fglist=[]
+                elist=[]
+                flist=list()
+
+                for i, row in gdf.iterrows():
+                    row=row.dropna()
+                    fln='_'.join(list(row))
+                    flist.append(fln)
+                    elist.append(fln[-3:].lower())
+                fgroup={'group':k,'files':flist,'length':len(flist),'min_filename':min(flist, key=len),'extensions':elist}
+                ls.append(fgroup)
+            flgdf=pd.DataFrame(ls)
+            flgdf=flgdf.dropna(thresh=1,axis=1)
+            fdf = Document_Analysis.get_structured_files_dataframe(flgdf)
+            fdf=fdf.rename(columns={"file":"filename","group":"filegroup","type":"filetype"})
+            print("parsing")
+            
+            pool = mp.Pool(processes=4)
+            ind=int()
+            n=len(fdf)
+            results = [pool.apply(Document_Analysis.parsefile, args=(fdf[int(x*len(fdf)/n):int((x+1)*len(fdf)/n)],PDF_DIR,x,)) for x in range(0,n)]
+            # output = [p.get() for p in results]
+            fdf=pd.concat(results)
+            # fdf=Document_Analysis.parsefile(fdf)
             fdf,fgdf=Document_Analysis.update_filetype(fdf)
             ############
             #mongoupdate here
             ############
-
-            #######
             notification_corelation_dict = { 'N1' : {'N1','N4','N7','N11','N13'},
                        'N2' : {'N2','N4','N7','N8','N11','N13','N15','N16'},
                        'N3' : {'N3','N4','N7','N8','N11','N13','N15','N16'},
@@ -740,12 +746,12 @@ class Document_Analysis:
                        'N15' : {'N2','N3','N4','N9','N10','N11','N15'},
                        'N16' : {'N2','N3','N4','N9','N10','N11','N16'}
             } 
-            kdf,suspkdf=Document_Analysis.keywordimport() 
+            kdf,suspkdf=Document_Analysis.keywordimport()
+            print("classification")
             fdf=Document_Analysis.get_classify_result(fdf,kdf,suspkdf,notification_corelation_dict)
-
+            print("extraction")
             fgdf=Document_Analysis.extract_data_from_filegroups(fdf,kdf)
-            engine = create_engine(ConfigClass.SQLALCHEMY_DATABASE_URI)
-            session = Document_Analysis.loadSession(engine)
+
             max_v = model.db.session.query(model.db.func.max(model.ProccessLog.batch_id)).scalar()
             if max_v==None:
                 newmax=1
@@ -755,6 +761,8 @@ class Document_Analysis:
                                             creation_date = datetime.datetime.now(),process_date=datetime.datetime.now())
             model.db.session.add(proccess_log)
             model.db.session.commit()
+            # fgdf=fgdf.fillna('')
+            fgdf=fgdf.applymap(lambda x: x if x==x else '')
             fgdf=fgdf.applymap(lambda x: None if x=='' else x)
             mdb = DbConf.mdb
             fileData = DbConf.fileData
@@ -765,6 +773,9 @@ class Document_Analysis:
                }
                 fileData.insert_one(data)
             for i , rr in fgdf.iterrows():
+                timeframe=None
+                if rr['Time Frame']==rr['Time Frame']:
+                    timeframe=rr['Time Frame']
                 kk = model.FileGroup(file_group = rr['filegroup'],
                                                court = rr['Court'],
                                                court_initial = rr['Court'],
@@ -772,7 +783,7 @@ class Document_Analysis:
                                                solicitor_initial = rr['Solictor'],
                                                procedure_type =rr['Procedure_Type'],
                                                procedure_type_initial = rr['Procedure_Type'],
-                                               time_frame = rr['Time Frame'],
+                                               time_frame = timeframe,
                                                document_date_initial =rr['Document date'],
                                                document_date = rr['Document date'],
                                                stamp_date_initial =rr['Stamp date'], 
@@ -790,16 +801,21 @@ class Document_Analysis:
                                     )
                 model.db.session.add(kk)
                 model.db.session.commit()
+            writer = pd.ExcelWriter(PDF_DIR+'/../'+'Sample File_Details.xlsx', engine='openpyxl')
+            fdf[['filename','filegroup','filetype','keywords','pred_class','final_categ']].to_excel(writer,'Sheet1')
+            writer.save()
             for i , r in fdf.iterrows():
                 k = model.FileClassificationResult(file_name =r['filename'],
                                              file_group =r['filegroup'],
                                              file_type=r['filetype'],
                                              predicted_classes=json.dumps(r['final_categ']),
+                                             keyword=json.dumps(r['keywords']),
                                              batch_id=newmax,
                                              creation_date = datetime.datetime.now())
                 model.db.session.add(k)
                 model.db.session.commit()
-                shutil.move(join( PDF_DIR,r.filename),join(root_archive,r.filename))
+                shutil.copy(join( PDF_DIR,r.filename),join(root_archive,r.filename))
+                os.remove(join( PDF_DIR,r.filename))
             return True
         else:
             return False

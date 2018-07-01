@@ -20,9 +20,6 @@ class SuspendKeywords(Base):
     __tablename__ = 'suspend_keywords'
     __table_args__ = {'autoload': True}
 
-class File_class(Base):
-    __tablename__ = 'file_class'
-    __table_args__ = {'autoload': True}
 
 def loadSession():
     metadata = Base.metadata
