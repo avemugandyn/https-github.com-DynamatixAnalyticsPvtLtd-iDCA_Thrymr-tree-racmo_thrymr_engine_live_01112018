@@ -414,14 +414,14 @@ class Document_Analysis:
 
 
     def extract_data_from_filegroups(fdf,kdf,path):
-        Procedure_Type_Mapping = {'131': 'HIP','176': 'CON','186': 'CON','1EH': 'HIP','1MO': 'MON','1NJ': 'ETN','1TJ': 'ETJ','2AM': 'DCO',
-             '2CS': 'EJE','AJM': 'AUX','ASE': 'CON','CAC': 'CON','CNA': 'CON','CNC': 'DCO','CNO': 'CON','CNS': 'CON','COG': 'COG',
-             'CON': 'CON','DPR': 'DP','EJC': 'EJE','EJH': 'HIP','ENJ': 'ETN','ETJ': 'ETJ','FIC': 'DCO','I62': 'CON','ICO': 'CON',
-             'JCB': 'CAM','JCU': 'JC','JVB': 'VER','MCC': 'MC','MNC': 'MCU','MON': 'MON','NUL': 'ETNJ','ORD': 'ORD','PCA': 'CON',
-             'PCI': 'CON','PCO': 'CON','PLD': 'PLD','POE': 'ETJ','POH': 'PSO','POJ': 'PSO','PTC': 'PTC','PTG': 'VER','RCA': 'RCS',
-             'RPL': 'RAP','S02': 'CON','S03': 'CON','S04': 'CON','S05': 'CON','S1C': 'CON','S2A': 'CON','S4P': 'CON','S5C': 'CON',
-             'S5L': 'CON','SC2': 'CON','SC4': 'CON','SC5': 'CON','SC6': 'CON','TCD': 'TDO','TMH': 'TMD','V14': 'CNJ','VRB': 'VER',
-             'X39': 'CNJ','X53': 'DCO'}
+        Procedure_Type_Mapping = {'131': 'HIP','176': 'CON','186': 'CON','1EH': 'HIP','1MO': 'MON','1NJ': 'ETN','1TJ': 'ETJ','2AM': 'DCO',\
+                                '2CS': 'EJE','AJM': 'AUX','ASE': 'CON','CAC': 'CON','CNA': 'CON','CNC': 'DCO','CNO': 'CON','CNS': 'CON',\
+                                'CON': 'CON','DPR': 'DP','EJC': 'EJE','EJH': 'HIP','ENJ': 'ETN','ETJ': 'ETJ','FIC': 'DCO','I62': 'CON',\
+                                'ICO': 'CON','JCB': 'CAM','JCU': 'JC','JVB': 'VER','MCC': 'MC','MNC': 'MCU','MON': 'MON','NUL': 'ETNJ',\
+                                'ORD': 'ORD','PCA': 'CON','PCI': 'CON','PCO': 'CON','PLD': 'PLD','POE': 'ETJ','POH': 'PSO','POJ': 'PSO',\
+                                'PTC': 'PTC','PTG': 'VER','RCA': 'RCS','RPL': 'RAP','S02': 'CON','S03': 'CON','S04': 'CON','S05': 'CON',\
+                                'S1C': 'CON','S2A': 'CON','S4P': 'CON','S5C': 'CON','S5L': 'CON','SC2': 'CON','SC4': 'CON','SC5': 'CON',\
+                                'SC6': 'CON','TCD': 'TDO','TMH': 'TMD','V14COG': 'COG','VRB': 'VER','X39': 'CNJCNJ','X53': 'DCO'}
         numspan={"1":"uno","2":"dos","3":"tres","4":"cuatro","5":"cinco","6":"seis","7":"siete","8":"ocho","9":"nueve",\
                  "10":"diez","11":"once","12":"doce","13":"trece","14":"catorce","15":"quince","16":"dieciseis",\
                  "17":"diecisiete","18":"dieciocho","19":"diecinueve","20":"veinte","21":"veintiuno","22":"veintidós",\
@@ -430,7 +430,6 @@ class Document_Analysis:
         numcat={"1":"un","2":"dos","3":"tres","4":"quatre","5":"cinc","6":"sis","7":"set","8":"vuit","9":"nou","10":"deu",\
                 "11":"onze","12":"dotze","13":"tretze","14":"catorze","15":"quinze","16":"setze","17":"disset","18":"divuit",\
                 "19":"dinou","20" : "vint"}
-        Solicitor_keyword = ['ALCOCER ANTON, DOLORES [783]','GARCIA ABASCAL, SUSANA [721]','MALAGON LOYO, SILVIA [2058]']
         debtor_extraction = ["demandado , demandado , demandado , demandado d/na.","demandado , demandado , demandado d/na.",
                              "demandado , demandado d/na.","demandado d/na.","demandado: d./dna.","demandado:","demandado.",
                              "ejecutado , ejecutado , ejecutado d/na.", "ejecutado: d./dna.","ejecutado d/na.","ejecutado:",
@@ -505,8 +504,8 @@ class Document_Analysis:
 
                     fgdf.loc[fi,'Debtor']=debtor.upper()
     # #                 fgdf.loc[fi,'Court']=s.split('\n')[0]
-           #         if 'procurador' in s.lower():
-              #          fgdf.loc[fi,'Solictor']=list([_f for _f in s[s.lower().index('procurador')+10:].split('\n') if _f])[0]
+                    if 'procurador' in s.lower():
+                        fgdf.loc[fi,'Solictor']=list([_f for _f in s[s.lower().index('procurador')+10:].split('\n') if _f])[0]
                     ptype=""
     ####
                     if ptype!="":
@@ -582,7 +581,7 @@ class Document_Analysis:
             for i,r in fdf[(fdf['filetype']=='TICKET')&(fdf['filename'].isin(fr['files']))].iterrows():
                     proced=''
                     x=r.filename.split('_')[2]
-                    if x in  list(Procedure_Type_Mapping.keys()):
+                    if x in  Procedure_Type_Mapping.keys():
                         proced= Procedure_Type_Mapping[x]
                     fgdf.loc[fi,'Procedure_Type']=proced
                     if r.table_response[:5]!='Error':
@@ -593,8 +592,8 @@ class Document_Analysis:
                         table2=json.loads(js['table_2'])
         #                 print(r['filename'],js["table_1"][[x for x in js["table_1"].keys() if 'Fecha' in x][0]],table2['1'][[x for x in table2['1'].keys() if 'Fecha' in x][0]])
                         c+=1
-                        fgdf.loc[fi,"Document date"]=js["table_1"][[x for x in list(js["table_1"].keys()) if 'Fecha' in x][0]]
-                        fgdf.loc[fi,"Stamp date"]=table2['1'][[x for x in list(table2['1'].keys()) if 'Fecha' in x][0]]
+                        fgdf.loc[fi,"Document date"]=js["table_1"][[x for x in js["table_1"].keys() if 'Fecha' in x][0]]
+                        fgdf.loc[fi,"Stamp date"]=table2['1'][[x for x in table2['1'].keys() if 'Fecha' in x][0]]
         #                 print js
                         t_text = r['text_response']
                         try:
@@ -606,7 +605,7 @@ class Document_Analysis:
                                     fgdf.loc[fi,'Solictor']= ''
                                     
                             #fgdf.loc[fi,'Solictor']=   #js["table_1"]['Destinatarios']['_value']
-                            fgdf.loc[fi,'Court']=js["table_1"]['Remitente'][[x for x in list(js["table_1"]['Remitente'].keys()) if str(x)[:6].lower()=='organo'][0]]
+                            fgdf.loc[fi,'Court']=js["table_1"]['Remitente'][[x for x in js["table_1"]['Remitente'].keys() if str(x)[:6].lower()=='organo'][0]]
 
                         except Exception as e:
                             c+=1
@@ -622,7 +621,7 @@ class Document_Analysis:
                         if not (match1-match2) is None :
                             auto=list(match1-match2)[0]
                     else:
-                        ts = unidecode.unidecode(str(textract.process(path+"/"+r['filename']),'UTF-8'))
+                        ts = unidecode.unidecode(unicode(textract.process(path+"/"+r['filename']),'UTF-8'))
                         try:
                             fgdf.loc[fi,'Court']=ts.split('Organo')[1].split('\n')[1]
                             for soli_n in Solicitor_keyword:
@@ -630,7 +629,7 @@ class Document_Analysis:
                                     fgdf.loc[fi,'Solictor']= soli_n
                                     break
                         except Exception as e:
-                            print((str(e)))
+                            print(str(e))
 
 
             if( 'N7' in fr['predicted_classes']):
