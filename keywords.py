@@ -50,13 +50,15 @@ def insert_record_in_keyword():
     kxddf=b['keywords']
     suspkdf=b['susKeyword']
     # # copy1 postgres copy2 pydblite
-    print(kxddf)
     for i,r in kxddf.iterrows():
         
         k = Keywords(file_class =r['fileclass'], file_type =r['filetype'], purpose=r['purpose'],
                      decision_type=r['decision_type'], keyword=json.dumps(r['keyword']),bias=r['bias'])
         session.add(k)
         session.commit()
+    print("link")
+    create_link_between_keyword(kxddf)
+    print("suspend")
     # print(len(suspkdf),suspkdf)
     for j,sr in suspkdf.iterrows():
         Sk = SuspendKeywords(file_class=sr['file_class'], file_type=sr['file_type'],
@@ -68,6 +70,5 @@ def insert_record_in_keyword():
             
 if __name__ == '__main__':
     kdf = insert_record_in_keyword()
-    create_link_between_keyword(kdf)
 
     

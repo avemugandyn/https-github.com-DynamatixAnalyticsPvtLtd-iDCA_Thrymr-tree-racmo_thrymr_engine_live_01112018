@@ -735,8 +735,13 @@ class Document_Analysis:
                             auto=list(match1-match2)[0]
 
                     else:
-                        ts = unidecode.unidecode(textract.process(path+"/"+r['filename']),'UTF-8')
+                        
                         try:
+                            try:
+                                ts = unidecode.unidecode(textract.process(path+"/"+r['filename']))
+                            except Exception as e:
+                                ts = unidecode.unidecode(textract.process(path+"/"+r['filename']).decode('utf-8'))
+                                print(str(e))
                             if r['filename'] == '2009_0000375_CNO_20181020773555820180508145715_011.pdf':
                                 fgdf.loc[fi,'Court']=ts.split('Organo')[1].split('\n')[3]
                             else:
@@ -770,12 +775,14 @@ class Document_Analysis:
                         for match in matches:
                             fgdf.loc[fi,"Date_of_hearing"]=str(match)
                             break
-
-            if auto=='':
-                sp=fgdf.loc[fi,'files'][0].split('_')
-                fgdf.loc[fi,'Auto']=str(int(sp[1]))+'/'+str(int(sp[0]))
-            else:
-                fgdf.loc[fi,'Auto']= str(int(auto.split('/')[0]))+'/'+str(int(auto.split('/')[1]))
+            try:
+                if auto=='':
+                    sp=fgdf.loc[fi,'files'][0].split('_')
+                    fgdf.loc[fi,'Auto']=str(int(sp[1]))+'/'+str(int(sp[0]))
+                else:
+                    fgdf.loc[fi,'Auto']= str(int(auto.split('/')[0]))+'/'+str(int(auto.split('/')[1]))
+            except Exception as e:
+                print("autos ",str(e))
 
         return fgdf
 

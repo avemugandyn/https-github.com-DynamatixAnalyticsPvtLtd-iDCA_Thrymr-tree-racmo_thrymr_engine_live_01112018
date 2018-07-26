@@ -62,6 +62,7 @@ class Models(object):
             date_of_hearing_initial = db.Column(db.Text, nullable=True)
             debtor = db.Column(db.Text, nullable=True)
             debtor_initial = db.Column(db.Text, nullable=True)
+            possible_debtors = db.Column(db.Text, nullable=True)
             batch_id = db.Column(db.Integer, nullable = False)
             court_number = db.Column(db.Text, nullable=True)
             court_number_initial = db.Column(db.Text, nullable=True)
@@ -86,3 +87,4 @@ class Models(object):
         return Keyword, FileClassificationResult, SuspendKeywords, FileGroup, ProccessLog
 
     
+           
