@@ -2,9 +2,9 @@ import os
 from pymongo import MongoClient
 
 class DbConf(object):
-    name = "aim"
-    username = "racmo2"    #os.environ.get('DB_USER')
-    password = "7N8IswX26@18" #os.environ.get('DB_PASSWORD') 
+    name = "test_db"  #"aim"
+    username = "racmo"    #"racmo2"    #os.environ.get('DB_USER')
+    password = "test123"   #"7N8IswX26@18" #os.environ.get('DB_PASSWORD') 
     port = "3306"
     host = "localhost"
     # connect to Mongo-database
@@ -21,8 +21,8 @@ class ConfigClass(object):
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL','mysql+pymysql://'+DbConf.username+':'+\
                                         DbConf.password+'@'+DbConf.host+':'+DbConf.port+'/'+ DbConf.name)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    NEW_FOLDER = '/home/thrymr/Notification Engine/new'
-    ARCHIVE_FOLDER = '/home/thrymr/Notification Engine/archived'
+    NEW_FOLDER = '/home/thrymr/Notifications/testing/new'
+    ARCHIVE_FOLDER = '/home/thrymr/Notifications/testing/archive'
 
 
 class SessionConf(object):
