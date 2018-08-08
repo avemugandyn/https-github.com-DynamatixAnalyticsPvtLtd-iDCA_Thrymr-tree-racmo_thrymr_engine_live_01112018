@@ -31,7 +31,6 @@ import datefinder
 class Document_Analysis:
 
 # SELECT max(batch_id) FROM file_classification;
-
     def keywordimport():
         engine = create_engine(ConfigClass.SQLALCHEMY_DATABASE_URI)
         
