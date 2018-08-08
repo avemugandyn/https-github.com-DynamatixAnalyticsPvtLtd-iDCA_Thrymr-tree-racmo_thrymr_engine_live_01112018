@@ -18,7 +18,6 @@ import unidecode
 from fuzzysearch import find_near_matches
 import textract
 import unicodedata
-import ast
 import psycopg2
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
@@ -33,7 +32,6 @@ class Document_Analysis:
 
 # SELECT max(batch_id) FROM file_classification;
 
-#Importing Keywords and declassifiing keywords from mysql and storing them in dataframes(kdf,suspkdf respectively)
     def keywordimport():
         engine = create_engine(ConfigClass.SQLALCHEMY_DATABASE_URI)
         
