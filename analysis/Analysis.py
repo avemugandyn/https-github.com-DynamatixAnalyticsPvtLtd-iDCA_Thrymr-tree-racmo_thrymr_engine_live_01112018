@@ -28,6 +28,7 @@ import datetime
 import multiprocessing as mp
 import datefinder
 
+
 class Document_Analysis:
 
 # SELECT max(batch_id) FROM file_classification;
