@@ -21,7 +21,7 @@ class ConfigClass(object):
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL','mysql+pymysql://'+DbConf.username+':'+\
                                         DbConf.password+'@'+DbConf.host+':'+DbConf.port+'/'+ DbConf.name)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    NEW_FOLDER = '/home/thrymr/Racmo/processed/batch_41' #'/home/thrymr/Notifications/testing/test_new'#'/home/racmo/notifications/upload_zip_test' #'/home/thrymr/Notifications/testing/test_map' #'/home/racmo/notifications/upload_zip_test'  
+    NEW_FOLDER = '/home/thrymr/Notification Engine/upload_prod/' #'/home/thrymr/Notifications/testing/test_new'#'/home/racmo/notifications/upload_zip_test' #'/home/thrymr/Notifications/testing/test_map' #'/home/racmo/notifications/upload_zip_test'  
     ARCHIVE_FOLDER = '/home/thrymr/Racmo/processed/archived'
 
 

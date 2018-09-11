@@ -230,7 +230,7 @@ class Document_Analysis:
                 newtext=Document_Analysis.get_pdf_text(pf)
             if(len(newtext.split())==0):
                 print("scan")
-                newtext =textract.process(pf,method='tesseract').decode('utf-8')
+                newtext =textract.process(pf,method='tesseract')
             try:
                 newtext=(''.join((c for c in unicodedata.normalize('NFD', newtext) if unicodedata.category(c) != 'Mn'))).lower()
             except Exception as e:
@@ -256,7 +256,7 @@ class Document_Analysis:
             zip_dict ={}
             if r.filename[-3:].lower()=='zip':
                 z_files = []
-                print((r.filename.split('.')[0]))
+                print(r.filename.split('.')[0])
                 with zipfile.ZipFile(join(PDF_DIR,r.filename)) as z:
                     for fileinzip in [x for x in z.namelist()]:
                         if not os.path.isdir(fileinzip):
@@ -289,7 +289,7 @@ class Document_Analysis:
                                  print(e)
                 zip_dict[r['filegroup']]= z_files                                                                  
             if zip_dict !={}:
-                for k,val in list(zip_dict.items()):
+                for k,val in zip_dict.items():
                     for v in val:
                         ffdf = ffdf.append(pd.Series(v), ignore_index=True) 
                    
@@ -380,7 +380,7 @@ class Document_Analysis:
                     if f:
                         bias1=Document_Analysis.get_predclass_normal(kdf,kr,j,text,fdf)
                         bias=bias1
-                    if kr['fileclass'] in list(fdf.loc[j,'keywords'].keys()):
+                    if kr['fileclass'] in fdf.loc[j,'keywords'].keys():
                         fdf.loc[j,'keywords'][kr['fileclass']].append(kr['keyword'])
                     else:
                         fdf.loc[j,'keywords'][kr['fileclass']]=list()
@@ -402,7 +402,7 @@ class Document_Analysis:
                 if f:
                     bias1=Document_Analysis.get_predclass_fuzzy(kdf,kr,j,text,fdf)
                     bias=bias1
-                    if kr['fileclass'] in list(fdf.loc[j,'keywords'].keys()):
+                    if kr['fileclass'] in fdf.loc[j,'keywords'].keys():
                         fdf.loc[j,'keywords'][kr['fileclass']].append(kr['keyword'])
                     else:
                         fdf.loc[j,'keywords'][kr['fileclass']]=list()
@@ -427,117 +427,122 @@ class Document_Analysis:
         NX_filename_N1_N5=['S05','S02','CNO','S5L','S05','S04','S01','CNA','S5C','PCO','ASE','S3A','ICO','S1C']
 
         classlis=[]
-        
+        #header keywords
+        document_start=["AUTO", "DECRETO", "DILIGENCIA DE ORDENACION", "DILIGENCIA D\'ORDENACIO", "PROVIDENCIA DEL/DE LA MAGISTRADO-JUEZ",
+                    "PROVIDENCIA LA MAGISTRADA JUEZ QUE LA DICTA", "PROVIDENCIA JUEZ/MAGISTRADO-JUEZ", "PROVIDENCIA DEL/DE LA JUEZ", "SENTENCIA"]
+
         caratula_keywords = ['NOTIFICACION TELEMATICA', 'DENTRO DEL ARCHIVO COMPRIMIDO']
     
         n2_prec_keywords = ['PARTE DISPOSITIVA', 'ANTECEDENTES DE HECHO', 'DILIGENCIA DE ORDENACIÓN']
 
         fdf  = fdf.loc[fdf['filename']==file_name]
         for j, row in fdf.iterrows():
-            if row['filetype']!='TICKET':
-            
+            if row['filetype']=='TICKET':
+                text = unidecode.unidecode(row['text_response']).lower()
+#             text=''.join(unidecode.unidecode(unicode(row['text_response'],'utf-8')).split()).lower()
+            else:
                 text = (row['text_response']).lower()
+#             orgtext=''.join(unidecode.unidecode(row['text_response']).split())
 
-
-                text = re.sub(' +',' ', text)
-                text = text.replace('\n', '')
-                text = text.replace('\xaa', '')
-                paratlist=['MODO DE IMPUGNACION:', 'mode d\'impugnacio', 'recurso de repelacion',
-                           'recurs de reposicio', 'recurso de reposicion', 'recurso de apelacion', 
-                           'INTERPONER RECURSO DIRECTO DE REVISION']
-                rem=''
-                for parat in paratlist:
-
-                    rem_word = parat.lower()
-                    if (rem_word in text):
-                        rem=text.split(rem_word)[-1]
-                    text=text.replace(rem,'')
+            text = re.sub(' +',' ', text)
+            text = text.replace('\n', '')
+            text = text.replace('\xaa', '')
+            paratlist=['MODO DE IMPUGNACION:', 'mode d\'impugnacio', 'recurso de repelacion',
+                   'recurs de reposicio', 'recurso de reposicion', 'recurso de apelacion', 
+                  'INTERPONER RECURSO DIRECTO DE REVISION']
+            rem=''
+            for parat in paratlist:
+#             rem_word = ''.join(parat.split()).lower()
+                rem_word = parat.lower()
+                if (rem_word in text):
+                    rem=text.split(rem_word)[-1]
+                text=text.replace(rem,'')
             
-                if all(word.lower() in text for word in caratula_keywords):
-                    fdf.loc[j, 'filetype'] = 'CARATULA'
+            if all(word.lower() in text for word in caratula_keywords):
+                fdf.loc[j, 'filetype'] = 'CARATULA'
         
+            for i,kdrow in kdf.iterrows():
+                if text[:5]!='Error':
+                    f=True
+                    for k in kdrow['keyword']:
+                        kw = unidecode.unidecode(k)
+                        if not (re.search(r'\b' + kw + r'\b', text)):
+                            f=False
+
+                    if f and (kdrow['filetype']==row['filetype'] or(kdrow['filetype']=='NOTIFICATION' and row['filetype']=='OTHER') )and (kdrow['purpose']=='CLASSIFICATION'):
+                        fdf.loc[j,'pred_class'].append(Document_Analysis.get_predclass_normal(kdf,kdrow,j,text,fdf))
+                        if kdrow['fileclass'] in fdf.loc[j,'keywords'].keys():
+                            fdf.loc[j,'keywords'][kdrow['fileclass']].append(kdrow['keyword'])
+                        else:
+                            fdf.loc[j,'keywords'][kdrow['fileclass']]=list()
+                            fdf.loc[j,'keywords'][kdrow['fileclass']].append(kdrow['keyword'])
+
+            if not bool(fdf.loc[j,'keywords']):
+                special_keywords = ['facilite','despachar','admitir','oigase']
                 for i,kdrow in kdf.iterrows():
                     if text[:5]!='Error':
-                        f=True
-                        for k in kdrow['keyword']:
-                            kw = unidecode.unidecode(k)
-                            if not (re.search(r'\b' + kw + r'\b', text)):
-                                f=False
-
-                        if f and (kdrow['filetype']==row['filetype'] or(kdrow['filetype']=='NOTIFICATION' and row['filetype']=='OTHER') )and (kdrow['purpose']=='CLASSIFICATION'):
-                            fdf.loc[j,'pred_class'].append(Document_Analysis.get_predclass_normal(kdf,kdrow,j,text,fdf))
-                            if kdrow['fileclass'] in list(fdf.loc[j,'keywords'].keys()):
+                        f=False
+                        if(kdrow['filetype']==row['filetype'] or(kdrow['filetype']=='NOTIFICATION' and row['filetype']=='OTHER') )and (kdrow['purpose']=='CLASSIFICATION'):
+                            f=True
+                            for k in kdrow['keyword']: 
+                                kw = unidecode.unidecode(k)
+                                if (len(kw) < 5) or any(sp in kw.lower() for sp in special_keywords ):
+                                    if not (re.search(r'\b' + kw + r'\b', text)):
+                                        f=False
+                                else:
+                                    match=[]
+                                    try:
+                                        match=find_near_matches(kw.lower(), text, max_l_dist=1)
+                                    except Exception as e:
+                                        f=False
+                                    if len(match)==0:
+                                        f=False
+                        if f:
+                            fdf.loc[j,'pred_class'].append(Document_Analysis.get_predclass_fuzzy(kdf,kdrow,j,text,fdf))
+                            if kdrow['fileclass'] in fdf.loc[j,'keywords'].keys():
                                 fdf.loc[j,'keywords'][kdrow['fileclass']].append(kdrow['keyword'])
                             else:
                                 fdf.loc[j,'keywords'][kdrow['fileclass']]=list()
                                 fdf.loc[j,'keywords'][kdrow['fileclass']].append(kdrow['keyword'])
+            fdf.set_value(j,'pred_class',list(set(fdf.loc[j,'pred_class'])))
 
-                if not bool(fdf.loc[j,'keywords']):
-                    special_keywords = ['facilite','despachar','admitir','oigase']
-                    for i,kdrow in kdf.iterrows():
-                        if text[:5]!='Error':
-                            f=False
-                            if(kdrow['filetype']==row['filetype'] or(kdrow['filetype']=='NOTIFICATION' and row['filetype']=='OTHER') )and (kdrow['purpose']=='CLASSIFICATION'):
-                                f=True
-                                for k in kdrow['keyword']: 
-                                    kw = unidecode.unidecode(k)
-                                    if (len(kw) < 5) or any(sp in kw.lower() for sp in special_keywords ):
-                                        if not (re.search(r'\b' + kw + r'\b', text)):
-                                            f=False
-                                    else:
-                                        match=[]
-                                        try:
-                                            match=find_near_matches(kw.lower(), text, max_l_dist=1)
-                                        except Exception as e:
-                                            f=False
-                                        if len(match)==0:
-                                            f=False
-                            if f:
-                                fdf.loc[j,'pred_class'].append(Document_Analysis.get_predclass_fuzzy(kdf,kdrow,j,text,fdf))
-                                if kdrow['fileclass'] in list(fdf.loc[j,'keywords'].keys()):
-                                    fdf.loc[j,'keywords'][kdrow['fileclass']].append(kdrow['keyword'])
-                                else:
-                                    fdf.loc[j,'keywords'][kdrow['fileclass']]=list()
-                                    fdf.loc[j,'keywords'][kdrow['fileclass']].append(kdrow['keyword'])
-                fdf.set_value(j,'pred_class',list(set(fdf.loc[j,'pred_class'])))
-
-                for si,sr in suspkdf.iterrows():
-                    f=True
-                    for sk in sr['keyword']:
-                        if not (''.join(unidecode.unidecode(sk).split()).lower() in ''.join(text.split() )):
-                            f=False
-                    if f and (row['filetype']=='NOTIFICATION' or row['filetype']=='OTHER'):
-                        if  not ((sr['remove_class']=='N2' or sr['remove_class']=='N12')and("SE ALZA LA SUSPENSION DE LAS ACTUACIONES".lower() in text)):
-                            if 'NX-'+sr['remove_class'] in list(fdf.loc[j,'keywords'].keys()):
-                                fdf.loc[j,'keywords']['NX-'+sr['remove_class']].append(sr['keyword'])
-                            else:
-                                fdf.loc[j,'keywords']['NX-'+sr['remove_class']]=list()
-                                fdf.loc[j,'keywords']['NX-'+sr['remove_class']].append(sr['keyword'])
-                            fdf.loc[j,'remove_class'].append(sr['remove_class'])
+            for si,sr in suspkdf.iterrows():
                 f=True
-                fdf.set_value(j,'remove_class',list(set(fdf.loc[j,'remove_class'])))
-                if not 'N-ALL' in fdf.loc[j,'remove_class']:
-                    for cl in list(set(fdf.loc[j,'pred_class'])-set(fdf.loc[j,'remove_class'])):
-                        fdf.loc[j,'after_classfn'].append(cl)
-                for cla in list(fdf.loc[j,'after_classfn'] ): 
-                    s=set(notification_corelation_dict[cla])
-                    if not(set(row['after_classfn'])<=(s) and set([cla])<=set(row['after_classfn'])):
+                for sk in sr['keyword']:
+                    if not (''.join(unidecode.unidecode(sk).split()).lower() in ''.join(text.split() )):
                         f=False
-                if f:
-                    fdf.set_value(j,'final_categ',list(set(fdf.loc[j,'after_classfn'])))
-                if 'N1' in fdf.loc[j,'final_categ'] or 'N5' in fdf.loc[j,'final_categ']:
-                    fl=False
-                    for flnx in NX_filename_N1_N5:
-                        if flnx in fdf.loc[j,'filename'].split('_')[2]:
-                            fl=True
-                    if fl:
-                        if 'N1' in fdf.loc[j,'final_categ']:
-                            fdf.loc[j,'final_categ'].remove('N1')
-                        elif 'N5' in fdf.loc[j,'final_categ']:
-                            fdf.loc[j,'final_categ'].remove('N5')
+                if f and (row['filetype']=='NOTIFICATION' or row['filetype']=='OTHER'):
+                    if  not ((sr['remove_class']=='N2' or sr['remove_class']=='N12')and("SE ALZA LA SUSPENSION DE LAS ACTUACIONES".lower() in text)):
+                        if 'NX-'+sr['remove_class'] in fdf.loc[j,'keywords'].keys():
+                            fdf.loc[j,'keywords']['NX-'+sr['remove_class']].append(sr['keyword'])
+                        else:
+                            fdf.loc[j,'keywords']['NX-'+sr['remove_class']]=list()
+                            fdf.loc[j,'keywords']['NX-'+sr['remove_class']].append(sr['keyword'])
+                        fdf.loc[j,'remove_class'].append(sr['remove_class'])
+            f=True
+            fdf.set_value(j,'remove_class',list(set(fdf.loc[j,'remove_class'])))
+            if not 'N-ALL' in fdf.loc[j,'remove_class']:
+                for cl in list(set(fdf.loc[j,'pred_class'])-set(fdf.loc[j,'remove_class'])):
+                    fdf.loc[j,'after_classfn'].append(cl)
+            for cla in list(fdf.loc[j,'after_classfn'] ): 
+                s=set(notification_corelation_dict[cla])
+                if not(set(row['after_classfn'])<=(s) and set([cla])<=set(row['after_classfn'])):
+                    f=False
+            if f:
+                fdf.set_value(j,'final_categ',list(set(fdf.loc[j,'after_classfn'])))
+            if 'N1' in fdf.loc[j,'final_categ'] or 'N5' in fdf.loc[j,'final_categ']:
+                fl=False
+                for flnx in NX_filename_N1_N5:
+                    if flnx in fdf.loc[j,'filename'].split('_')[2]:
+                        fl=True
+                if fl:
+                    if 'N1' in fdf.loc[j,'final_categ']:
+                        fdf.loc[j,'final_categ'].remove('N1')
+                    elif 'N5' in fdf.loc[j,'final_categ']:
+                        fdf.loc[j,'final_categ'].remove('N5')
        
         fgs=fdf.groupby('filegroup')
-        for k,v in list(fgs.groups.items()):
+        for k,v in fgs.groups.items():
             f=False
             otherclass="N16"
             for ind in v:
@@ -719,56 +724,53 @@ class Document_Analysis:
             match1=set()
             match2=set()
             #list_of_possible_debtor = set()
-            for i,r in fdf[(fdf['filetype']!='TICKET')&(fdf['filetype']!='CARATULA')&(fdf['filename'].isin(fr['files']))].iterrows():
+            for i,r in fdf[(fdf['filetype']!='TICKET')&(fdf['filename'].isin(fr['files']))].iterrows():
                 if r['text_response'][:5]!='Error':
                     s = r['text_response']
                     if len(s.strip())>0:
-                        try:
-                            s=unidecode.unidecode('\n'.join(list([_f for _f in s.split('\n') if _f])).lower())
-                            debtor=''
-                            list_of_possible_debtor = set()
-                            for deb_ex in debtor_extraction:
-                                if deb_ex in s:
-                                    for d in s.split(deb_ex)[1:]: 
-                                        debtor =  d.split('\n')[0]
-                                        if len(d.split('\n'))>1:
-                                            debtor_2lines=d.split('\n')[0]+" "+d.split('\n')[1]+" "+[x for x in s.split(deb_ex)[0].split('\n')
+                        s=unidecode.unidecode('\n'.join(list([_f for _f in s.split('\n') if _f])).lower())
+                        debtor=''
+                        list_of_possible_debtor = set()
+                        for deb_ex in debtor_extraction:
+                            if deb_ex in s:
+                                for d in s.split(deb_ex)[1:]: 
+                                    debtor =  d.split('\n')[0]
+                                    if len(d.split('\n'))>1:
+                                        debtor_2lines=d.split('\n')[0]+" "+d.split('\n')[1]+" "+[x for x in s.split(deb_ex)[0].split('\n')
                                                                                          if len(x)>3][-1].strip()
-                                        if len(debtor.split())==0:
-                                            debtor = d.split('\n')[1]
-                                            if len(d.split('\n'))>2:
-                                                debtor_2lines=d.split('\n')[1]+" "+d.split('\n')[2]
-                                                debtor_2lines=d.split('\n')[1]+" "+d.split('\n')[2]+" "+[x for x in s.split(deb_ex)[0].split('\n')
+                                    if len(debtor.split())==0:
+                                        debtor = d.split('\n')[1]
+                                        if len(d.split('\n'))>2:
+                                            debtor_2lines=d.split('\n')[1]+" "+d.split('\n')[2]
+                                            debtor_2lines=d.split('\n')[1]+" "+d.split('\n')[2]+" "+[x for x in s.split(deb_ex)[0].split('\n')
                                                                                              if len(x)>3][-1].strip()
-                                        debtor = debtor.strip()
-                                        debtor=Document_Analysis.debtor_filter(debtor,debtor_extraction)
-                                        debtor_2lines=Document_Analysis.debtor_filter(debtor_2lines,debtor_extraction)
+                                    debtor = debtor.strip()
+                                    debtor=Document_Analysis.debtor_filter(debtor,debtor_extraction)
+                                    debtor_2lines=Document_Analysis.debtor_filter(debtor_2lines,debtor_extraction)
 
-                                        list_of_possible_debtor=list_of_possible_debtor.union(Document_Analysis.debtor_split(debtor,' y '))
-                                        list_of_possible_debtor=list_of_possible_debtor.union(Document_Analysis.debtor_split(debtor,','))
-                                        list_of_possible_debtor=list_of_possible_debtor.union(Document_Analysis.debtor_split(debtor_2lines,' y '))
-                                        list_of_possible_debtor=list_of_possible_debtor.union(Document_Analysis.debtor_split(debtor_2lines,','))
+                                    list_of_possible_debtor=list_of_possible_debtor.union(Document_Analysis.debtor_split(debtor,' y '))
+                                    list_of_possible_debtor=list_of_possible_debtor.union(Document_Analysis.debtor_split(debtor,','))
+                                    list_of_possible_debtor=list_of_possible_debtor.union(Document_Analysis.debtor_split(debtor_2lines,' y '))
+                                    list_of_possible_debtor=list_of_possible_debtor.union(Document_Analysis.debtor_split(debtor_2lines,','))
 
-                            if r['filetype']=='NOTIFICATION' and len(''.join(debtor.split())) >1:
-                                fgdf.loc[fi,'Debtor']=debtor.upper().strip()
-                            if len(''.join(fgdf.loc[fi,'Debtor'].split())) <=1 and len(''.join(debtor.split())) >1:
-                                fgdf.loc[fi,'Debtor']=debtor.upper().strip()
-                            fgdf.loc[fi,'list_of_possible_debtor']+=list_of_possible_debtor
+                        if r['filetype']=='NOTIFICATION' and len(''.join(debtor.split())) >1:
+                            fgdf.loc[fi,'Debtor']=debtor.upper().strip()
+                        if len(''.join(fgdf.loc[fi,'Debtor'].split())) <=1 and len(''.join(debtor.split())) >1:
+                            fgdf.loc[fi,'Debtor']=debtor.upper().strip()
+                        fgdf.loc[fi,'list_of_possible_debtor']+=list_of_possible_debtor
            
-                            ptype=""
-                            if ptype!="":
-                                if 'procedimiento' in s.lower():
-                                    match=re.search(r'(\d{1,20}/\d{4})',s.split('procedimiento')[1])
-                                else:
-                                    s1=''.join(s.split())
-                                    match1=set(re.findall(r'(\d{1,20}/\d{4})',s1))
-                                    match2={'/'.join(x.split('/')[1:])for x in re.findall(r'(\d{1,2}/\d{1,2}/\d{4})',s1)}
-                            if not match is None :
-                                auto=match.group(0)
-                            elif not (match1-match2) is None :
-                                auto=list(match1-match2)[0] if len(list(match1-match2))>0 else ''
-                        except Exception as e:
-                            print(str(e))
+                    ptype=""
+                    if ptype!="":
+                        if 'procedimiento' in s.lower():
+                            match=re.search(r'(\d{1,20}/\d{4})',s.split('procedimiento')[1])
+                        else:
+                            s1=''.join(s.split())
+                            match1=set(re.findall(r'(\d{1,20}/\d{4})',s1))
+                            match2={'/'.join(x.split('/')[1:])for x in re.findall(r'(\d{1,2}/\d{1,2}/\d{4})',s1)}
+                    if not match is None :
+                        auto=match.group(0)
+                    elif not (match1-match2) is None :
+                        auto=list(match1-match2)[0] if len(list(match1-match2))>0 else ''
 
 
             if('N1'in fr['predicted_classes'])or('N3'in fr['predicted_classes'])or('N4'in fr['predicted_classes'])or('N11'in fr['predicted_classes']):
@@ -937,17 +939,11 @@ class Document_Analysis:
                         except Exception as e:
                             print((str(e)))
                             js=json.loads(r.table_response)
-                        
+                        table2=json.loads(js['table_2'])
                         c+=1
-                        try:
-                            fgdf.loc[fi,"Document date"]=js["table_1"][[x for x in list(js["table_1"].keys()) if 'Fecha' in x][0]]
-                        except Exception as e:
-                            print(str(e))
-                        try:
-                            table2=json.loads(js['table_2'])
-                            fgdf.loc[fi,"Stamp date"]=table2['1'][[x for x in list(table2['1'].keys()) if 'Fecha' in x][0]]
-                        except Exception as e:
-                            print(str(e))
+                        fgdf.loc[fi,"Document date"]=js["table_1"][[x for x in list(js["table_1"].keys()) if 'Fecha' in x][0]]
+                        fgdf.loc[fi,"Stamp date"]=table2['1'][[x for x in list(table2['1'].keys()) if 'Fecha' in x][0]]
+
                         t_text = r['text_response']
                         try:
                             for soli_n in Solicitor_keyword:
@@ -977,37 +973,24 @@ class Document_Analysis:
 
                     else:
                         if r.filename[-3:].lower()!='zip':
-                            ts = ''
                             try:
                                 ts = unidecode.unidecode(textract.process(path+"/"+r['filename']))
                             except Exception as e:
-                                print("Error--->",str(e),r.filename)
-                            if ts =='':
-                                try:
-                                    ts = unidecode.unidecode(textract.process(path+"/"+r['filename']).decode('utf-8'))
-                                except Exception as e:
-                                    print("Error--->2",str(e),r.filename)
-                            if len(ts) >1:
-                                try:
-                                    if 'Organo' in ts:
-                                        court = ''
-                                        try:
-                                            court = ts.split('Organo')[1].split('\n')[1]
-                                        except Exception as e:
-                                            print(str(e))
-                                        fgdf.loc[fi,'Court']= court
-                                    for soli_n in Solicitor_keyword:
-                                        if soli_n in ts:
-                                            fgdf.loc[fi,'Solictor']= soli_n
-                                            break
-                                    tt = ''.join(ts.split())
-                                    if 'HistoriadelmensajeFecha-hora' in tt:
-                                        dd = re.search(r'\d{2}/\d{2}/\d{4}\d{2}:\d{2}', tt.split('HistoriadelmensajeFecha-hora')[1]).group(0)
-                                        fgdf.loc[fi,"Stamp date"] = re.search(r'\d{2}/\d{2}/\d{4}', dd).group(0)+" "+re.search(r'\d{2}:\d{2}', dd).group(0)
-                                except Exception as e:
-                                    print((str(e)))
+                                ts = unidecode.unidecode(textract.process(path+"/"+r['filename']).decode('utf-8'))
+                                print(str(e))
+                            try:
+                                fgdf.loc[fi,'Court']=ts.split('Organo')[1].split('\n')[1]
+                                for soli_n in Solicitor_keyword:
+                                    if soli_n in ts:
+                                        fgdf.loc[fi,'Solictor']= soli_n
+                                        break
+                            except Exception as e:
+                                print((str(e)))
                         
-
+                            tt = ''.join(ts.split())
+                            if 'HistoriadelmensajeFecha-hora' in tt:
+                                dd = re.search(r'\d{2}/\d{2}/\d{4}\d{2}:\d{2}', tt.split('HistoriadelmensajeFecha-hora')[1]).group(0)
+                                fgdf.loc[fi,"Stamp date"] = re.search(r'\d{2}/\d{2}/\d{4}', dd).group(0)+" "+re.search(r'\d{2}:\d{2}', dd).group(0)
 
                 for i,r in fdf[(fdf['filename'].isin(fr['files']))&(fdf['filetype']=='NOTIFICATION')].iterrows():
                     text=r['text_response']
@@ -1124,7 +1107,7 @@ class Document_Analysis:
                     newmax=1
                 else:
                     newmax = max_v+1
-                print(("Batch_id= ",newmax))
+                print("Batch_id= ",newmax)
                 proccess_log = model.ProccessLog( batch_id=newmax,creation_date = datetime.datetime.now(),
                                                  process_date=datetime.datetime.now())
                 model.db.session.add(proccess_log)
@@ -1181,12 +1164,10 @@ class Document_Analysis:
                                                  creation_date = datetime.datetime.now())
                     model.db.session.add(k)
                     model.db.session.commit()
-
                  
                     shutil.copy(join( PDF_DIR,r.filename),join(root_archive,r.filename))
                     os.remove(join( PDF_DIR,r.filename))
-                model.db.session.close()
-            
+                #model.db.session.close()
             print(("--- Extraction process time ---",(float(time.time() - ex_start_time)/60)))
             print(("--- Total time in minutes ---",(float(time.time() - t_time)/60)))
             DbConf.client.close() # for close mongoDb connection

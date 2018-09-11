@@ -944,8 +944,8 @@ class Document_Analysis:
                         except Exception as e:
                             print(str(e))
                         try:
-                            table2=json.loads(js['table_2'])
-                            fgdf.loc[fi,"Stamp date"]=table2['1'][[x for x in list(table2['1'].keys()) if 'Fecha' in x][0]]
+                           
+                            fgdf.loc[fi,"Send date"]=js["table_1"][[x for x in list(js["table_1"].keys()) if 'Fecha-hora env' in x][0]]
                         except Exception as e:
                             print(str(e))
                         t_text = r['text_response']
@@ -1001,9 +1001,9 @@ class Document_Analysis:
                                             fgdf.loc[fi,'Solictor']= soli_n
                                             break
                                     tt = ''.join(ts.split())
-                                    if 'HistoriadelmensajeFecha-hora' in tt:
-                                        dd = re.search(r'\d{2}/\d{2}/\d{4}\d{2}:\d{2}', tt.split('HistoriadelmensajeFecha-hora')[1]).group(0)
-                                        fgdf.loc[fi,"Stamp date"] = re.search(r'\d{2}/\d{2}/\d{4}', dd).group(0)+" "+re.search(r'\d{2}:\d{2}', dd).group(0)
+                                    if 'Fecha-hora env' in tt:
+                                        dd = re.search(r'\d{2}/\d{2}/\d{4}\d{2}:\d{2}', tt.split('Fecha-hora env')[1]).group(0)
+                                        fgdf.loc[fi,"Send date"] = re.search(r'\d{2}/\d{2}/\d{4}', dd).group(0)+" "+re.search(r'\d{2}:\d{2}', dd).group(0)
                                 except Exception as e:
                                     print((str(e)))
                         
@@ -1154,8 +1154,8 @@ class Document_Analysis:
                                                    time_frame = timeframe,
                                                    document_date_initial =rr['Document date'],
                                                    document_date = rr['Document date'],
-                                                   stamp_date_initial =rr['Stamp date'], 
-                                                   stamp_date = rr['Stamp date'],
+                                                   send_date_initial =rr['Send date'], 
+                                                   send_date = rr['Send date'],
                                                    auto =rr['Auto'],
                                                    auto_initial = rr['Auto'],
                                                    amount_initial =rr['Amount'], 
@@ -1181,14 +1181,13 @@ class Document_Analysis:
                                                  creation_date = datetime.datetime.now())
                     model.db.session.add(k)
                     model.db.session.commit()
-
                  
                     shutil.copy(join( PDF_DIR,r.filename),join(root_archive,r.filename))
                     os.remove(join( PDF_DIR,r.filename))
-                model.db.session.close()
-            
+                #model.db.session.close()
             print(("--- Extraction process time ---",(float(time.time() - ex_start_time)/60)))
             print(("--- Total time in minutes ---",(float(time.time() - t_time)/60)))
+
             DbConf.client.close() # for close mongoDb connection
             temp_df = pd.DataFrame()
             return True

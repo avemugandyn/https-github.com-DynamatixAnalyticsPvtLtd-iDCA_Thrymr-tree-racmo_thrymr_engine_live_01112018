@@ -11,7 +11,7 @@ class DbConf(object):
     client = MongoClient('mongodb://localhost:27017/')
     try:
         mdb = client.racmo
-        fileData = mdb.UATDATA
+        fileData = mdb.fileData
     except Exception as e:
         print(e)
 
@@ -21,8 +21,10 @@ class ConfigClass(object):
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL','mysql+pymysql://'+DbConf.username+':'+\
                                         DbConf.password+'@'+DbConf.host+':'+DbConf.port+'/'+ DbConf.name)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    NEW_FOLDER = '/home/thrymr/Racmo/processed/batch_41' #'/home/thrymr/Notifications/testing/test_new'#'/home/racmo/notifications/upload_zip_test' #'/home/thrymr/Notifications/testing/test_map' #'/home/racmo/notifications/upload_zip_test'  
-    ARCHIVE_FOLDER = '/home/thrymr/Racmo/processed/archived'
+    UPLOAD_FOLDER = "/home/thrymr/Racmo/pro"
+    PDF_DIR = "/home/thrymr/Racmo/RacmoIT/process/Gestured documents 15-02-2018"
+    NEW_FOLDER = '/home/thrymr/Notifications/test_user/new'
+    ARCHIVE_FOLDER = '/home/thrymr/Notifications/test_user/archived'
 
 
 class SessionConf(object):
