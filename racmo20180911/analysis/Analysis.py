@@ -712,6 +712,7 @@ class Document_Analysis:
         fgdf['list_of_possible_debtor']=fgdf['Debtor'].apply(lambda x : [])
         fgdf['Court']=''
         fgdf['Solictor']=''
+        fgdf['Send_date']=''
         c=0
         for fi,fr in fgdf.iterrows():
             auto=""
@@ -945,7 +946,7 @@ class Document_Analysis:
                             print(str(e))
                         try:
                            
-                            fgdf.loc[fi,"Send date"]=js["table_1"][[x for x in list(js["table_1"].keys()) if 'Fecha-hora env' in x][0]]
+                            fgdf.loc[fi,"Send_date"]=js["table_1"][[x for x in list(js["table_1"].keys()) if 'Fecha-hora env' in x][0]]
                         except Exception as e:
                             print(str(e))
                         t_text = r['text_response']
@@ -1003,7 +1004,7 @@ class Document_Analysis:
                                     tt = ''.join(ts.split())
                                     if 'Fecha-hora env' in tt:
                                         dd = re.search(r'\d{2}/\d{2}/\d{4}\d{2}:\d{2}', tt.split('Fecha-hora env')[1]).group(0)
-                                        fgdf.loc[fi,"Send date"] = re.search(r'\d{2}/\d{2}/\d{4}', dd).group(0)+" "+re.search(r'\d{2}:\d{2}', dd).group(0)
+                                        fgdf.loc[fi,"Send_date"] = re.search(r'\d{2}/\d{2}/\d{4}', dd).group(0)+" "+re.search(r'\d{2}:\d{2}', dd).group(0)
                                 except Exception as e:
                                     print((str(e)))
                         
@@ -1142,9 +1143,10 @@ class Document_Analysis:
                     fileData.insert_one(data)
                 for i , rr in fgdf.iterrows():
                     timeframe=None
-                    if rr['Time Frame']==rr['Time Frame']:
-                            timeframe=rr['Time Frame']
-                    kk = model.FileGroup(file_group = rr['filegroup'],
+                    try:
+                        if rr['Time Frame']==rr['Time Frame']:
+                                timeframe=rr['Time Frame']
+                        kk = model.FileGroup(file_group = rr['filegroup'],
                                                    court = rr['Court'],
                                                    court_initial = rr['Court'],
                                                    solicitor = rr['Solictor'],
@@ -1154,8 +1156,8 @@ class Document_Analysis:
                                                    time_frame = timeframe,
                                                    document_date_initial =rr['Document date'],
                                                    document_date = rr['Document date'],
-                                                   send_date_initial =rr['Send date'], 
-                                                   send_date = rr['Send date'],
+                                                   stamp_date_initial =rr['Send_date'], 
+                                                   stamp_date = rr['Send_date'],
                                                    auto =rr['Auto'],
                                                    auto_initial = rr['Auto'],
                                                    amount_initial =rr['Amount'], 
@@ -1168,26 +1170,30 @@ class Document_Analysis:
                                                    debtor = rr['Debtor'],
                                                    batch_id=newmax,
                                                    creation_date = datetime.datetime.now())
-                    model.db.session.add(kk)
-                    model.db.session.commit()
-                
-                for i , r in fdf.iterrows():
-                    k = model.FileClassificationResult(file_name =r['filename'],
+                        model.db.session.add(kk)
+                        model.db.session.commit()
+                    except Exception as e:
+                        print(e)
+                try:               
+                    for i , r in fdf.iterrows():
+                        k = model.FileClassificationResult(file_name =r['filename'],
                                                  file_group =r['filegroup'],
                                                  file_type=r['filetype'],
                                                  predicted_classes=json.dumps(r['final_categ']),
                                                  keyword=json.dumps(r['keywords']),
                                                  batch_id=newmax,
                                                  creation_date = datetime.datetime.now())
-                    model.db.session.add(k)
-                    model.db.session.commit()
-                 
-                    shutil.copy(join( PDF_DIR,r.filename),join(root_archive,r.filename))
-                    os.remove(join( PDF_DIR,r.filename))
-                #model.db.session.close()
+                        model.db.session.add(k)
+                        model.db.session.commit()
+                        shutil.copy(join( PDF_DIR,r.filename),join(root_archive,r.filename))
+                        os.remove(join( PDF_DIR,r.filename))
+                except Exception as e:
+                    print(e)
+
+
             print(("--- Extraction process time ---",(float(time.time() - ex_start_time)/60)))
             print(("--- Total time in minutes ---",(float(time.time() - t_time)/60)))
-
+            model.db.session.close()
             DbConf.client.close() # for close mongoDb connection
             temp_df = pd.DataFrame()
             return True
