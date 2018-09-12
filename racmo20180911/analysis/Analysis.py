@@ -1002,8 +1002,8 @@ class Document_Analysis:
                                             fgdf.loc[fi,'Solictor']= soli_n
                                             break
                                     tt = ''.join(ts.split())
-                                    if 'Fecha-hora env' in tt:
-                                        dd = re.search(r'\d{2}/\d{2}/\d{4}\d{2}:\d{2}', tt.split('Fecha-hora env')[1]).group(0)
+                                    if 'Fecha-horaenv' in tt:
+                                        dd = re.search(r'\d{2}/\d{2}/\d{4}\d{2}:\d{2}', tt.split('Fecha-horaenv')[1]).group(0)
                                         fgdf.loc[fi,"Send_date"] = re.search(r'\d{2}/\d{2}/\d{4}', dd).group(0)+" "+re.search(r'\d{2}:\d{2}', dd).group(0)
                                 except Exception as e:
                                     print((str(e)))
