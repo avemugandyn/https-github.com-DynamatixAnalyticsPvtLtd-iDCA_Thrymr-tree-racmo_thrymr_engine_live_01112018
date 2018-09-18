@@ -982,21 +982,38 @@ class Document_Analysis:
                             try:
                                 ts = unidecode.unidecode(textract.process(path+"/"+r['filename']))
                             except Exception as e:
-                                print("Error--->",str(e),r.filename)
+                                print(str(e))
                             if ts =='':
                                 try:
                                     ts = unidecode.unidecode(textract.process(path+"/"+r['filename']).decode('utf-8'))
                                 except Exception as e:
-                                    print("Error--->2",str(e),r.filename)
+                                    print("Error--->2",str(e))
                             if len(ts) >1:
                                 try:
                                     if 'Organo' in ts:
                                         court = ''
                                         try:
                                             court = ts.split('Organo')[1].split('\n')[1]
+                                            if court =='':
+                                                court = ts.split('Organo')[1].split('\n')[2]
+                                                ss = ts.split('Organo')[1].split('\n')[3]
+                                                if '[' in ss and ']' in ss:
+                                                #m = re.search(r"\[([0-9]+)\]", ss)
+                                                    court = court + ' '+ss
+                                            else:
+                                                ss = ts.split('Organo')[1].split('\n')[2]
+                                                if '[' in ss and ']' in ss:
+                                                #m = re.search(r"\[([0-9]+)\]", ss)
+                                                    court = court + ', '+ss
+
+                                            if 'Tipo' in court:
+                                                court = ts.split('Organo')[1].split('\n')[3]
+                                                if court == '':
+                                                    court = ts.split('Organo')[1].split('\n')[4]
                                         except Exception as e:
-                                            print(str(e))
+                                            print((str(e)))
                                         fgdf.loc[fi,'Court']= court
+
                                     for soli_n in Solicitor_keyword:
                                         if soli_n in ts:
                                             fgdf.loc[fi,'Solictor']= soli_n
