@@ -650,7 +650,8 @@ class Document_Analysis:
                      'PCI': 'CON','PCO': 'CON','PLD': 'PLD','POE': 'ETJ','POH': 'PSO','POJ': 'PSO','PTC': 'PTC','PTG': 'VER','RCA': 'RCS',
                      'RPL': 'RAP','S02': 'CON','S03': 'CON','S04': 'CON','S05': 'CON','S1C': 'CON','S2A': 'CON','S4P': 'CON','S5C': 'CON',
                      'S5L': 'CON','SC2': 'CON','SC4': 'CON','SC5': 'CON','SC6': 'CON','TCD': 'TDO','TMH': 'TMD','V14': 'CNJ','VRB': 'VER',
-                     'X39': 'CNJ','X53': 'DCO','S3A':'CON','PMC':'MC','PIE':'OTH','CUP':'OTH','181':'CON'}
+                     'X39': 'CNJ','X53': 'DCO','S3A':'CON','PMC':'MC','PIE':'OTH','CUP':'OTH','181':'CON','CAB':'OTH','CUA':'JC','I96':'CON',
+                     'ITC':'OTH','SCA':'CON','X00':'DP'}
 
         time_frame_day = {'catorce': '14','catorze': '14','cinc': '5','cinco': '5','cuatro': '4','deu': '10','diecinueve': '19','dieciocho': '18',
                   'dieciseis': '16','diecisiete': '17','diez': '10','dinou': '19','disset': '17','divuit': '18','doce': '12','dos': '2',
@@ -674,7 +675,7 @@ class Document_Analysis:
                              'la cantidad retenida a','la suma de','las sumas reclamadas y que son las siguentes: principal:',
                              'las sumas reclamadas y que son las siguientes: principal:','por  importe de',
                              'por las cantidades de','por las siguientes cantidades','principal reclamado','la cuantia de',
-                             'las sumas de','por un importe de','el importe de','cantidad de','pago por']
+                             'las sumas de','por un importe de','el importe de','cantidad de','pago por','la cantidad consignada de','por importe total de']
 
         months={"enero": "January", "febrero":"February", "marzo": "March","abril": "April",
                 "mayo":"May","junio":"June","julio":"July","agosto":"August","septiembre":"September","octubre":"October",
@@ -932,100 +933,98 @@ class Document_Analysis:
                 if x in  list(Procedure_Type_Mapping.keys()):
                     proced= Procedure_Type_Mapping[x]
                     fgdf.loc[fi,'Procedure_Type']=proced
-                    if r.table_response[:5]!='Error':
-                        try:
-                            js=json.loads( ''.join((c for c in unicodedata.normalize('NFD', r.table_response) if unicodedata.category(c) != 'Mn')))
-                        except Exception as e:
-                            print((str(e)))
-                            js=json.loads(r.table_response)
+                if r.table_response[:5]!='Error':
+                    try:
+                        js=json.loads( ''.join((c for c in unicodedata.normalize('NFD', r.table_response) if unicodedata.category(c) != 'Mn')))
+                    except Exception as e:
+                        print((str(e)))
+                        js=json.loads(r.table_response)
                         
-                        c+=1
-                        try:
-                            fgdf.loc[fi,"Document date"]=js["table_1"][[x for x in list(js["table_1"].keys()) if 'Fecha' in x][0]]
-                        except Exception as e:
-                            print(str(e))
-                        try:
+                    c+=1
+                    try:
+                        fgdf.loc[fi,"Document date"]=js["table_1"][[x for x in list(js["table_1"].keys()) if 'Fecha' in x][0]]
+                    except Exception as e:
+                        print(str(e))
+                    try:
                            
-                            fgdf.loc[fi,"Send_date"]=js["table_1"][[x for x in list(js["table_1"].keys()) if 'Fecha-hora env' in x][0]]
+                        fgdf.loc[fi,"Send_date"]=js["table_1"][[x for x in list(js["table_1"].keys()) if 'Fecha-hora env' in x][0]]
+                    except Exception as e:
+                        print(str(e))
+                    t_text = r['text_response']
+                    try:
+                        for soli_n in Solicitor_keyword:
+                            if soli_n in t_text:
+                                fgdf.loc[fi,'Solictor']= soli_n
+                                break
+                            else:
+                                fgdf.loc[fi,'Solictor']= ''
+                        fgdf.loc[fi,'Court']=js["table_1"]['Remitente'][[x for x in list(js["table_1"]['Remitente'].keys()) if str(x)[:6].lower()=='organo'][0]]
+                    except Exception as e:
+                        c+=1
+                    if fgdf.loc[fi,'Court'] =='' or fgdf.loc[fi,'Court'] == None:
+                        try:
+                            fgdf.loc[fi,'Court']=js["table_1"]['Destinatarios'][[x for x in list(js["table_1"]['Destinatarios'].keys()) if str(x)[:6].lower()=='organo'][0]]
+                        except:
+                            print("Court name not in Destinatarios")
+                    auto=""
+                    try:
+                        s=json.loads(unidecode.unidecode(r['table_response']))['table_1']['Datos del mensaje']['Procedimiento destino']
+                    except Exception as e:
+                        s=str( json.loads(r['table_response'])['table_1']['Datos del mensaje'])
+
+                    match1=set(re.findall(r'(\d{1,20}/\d{4})',s))
+                    match2={'/'.join(x.split('/')[1:])for x in re.findall(r'(\d{1,2}/\d{1,2}/\d{4})',s)}
+                    if not (match1-match2) is None :
+                        auto=list(match1-match2)[0]
+
+                else:
+                    if r.filename[-3:].lower()!='zip':
+                        ts = ''
+                        try:
+                            ts = unidecode.unidecode(textract.process(path+"/"+r['filename']))
                         except Exception as e:
                             print(str(e))
-                        t_text = r['text_response']
-                        try:
-                            for soli_n in Solicitor_keyword:
-                                if soli_n in t_text:
-                                    fgdf.loc[fi,'Solictor']= soli_n
-                                    break
-                                else:
-                                    fgdf.loc[fi,'Solictor']= ''
-                            fgdf.loc[fi,'Court']=js["table_1"]['Remitente'][[x for x in list(js["table_1"]['Remitente'].keys()) if str(x)[:6].lower()=='organo'][0]]
-                        except Exception as e:
-                            c+=1
-                        if fgdf.loc[fi,'Court'] =='' or fgdf.loc[fi,'Court'] == None:
+                        if ts =='':
                             try:
-                                fgdf.loc[fi,'Court']=js["table_1"]['Destinatarios'][[x for x in list(js["table_1"]['Destinatarios'].keys()) if str(x)[:6].lower()=='organo'][0]]
-                            except:
-                                print("Court name not in Destinatarios")
-                        auto=""
-                        try:
-                            s=json.loads(unidecode.unidecode(r['table_response']))['table_1']['Datos del mensaje']['Procedimiento destino']
-                        except Exception as e:
-                            s=str( json.loads(r['table_response'])['table_1']['Datos del mensaje'])
-
-                        match1=set(re.findall(r'(\d{1,20}/\d{4})',s))
-                        match2={'/'.join(x.split('/')[1:])for x in re.findall(r'(\d{1,2}/\d{1,2}/\d{4})',s)}
-                        if not (match1-match2) is None :
-                            auto=list(match1-match2)[0]
-
-                    else:
-                        if r.filename[-3:].lower()!='zip':
-                            ts = ''
-                            try:
-                                ts = unidecode.unidecode(textract.process(path+"/"+r['filename']))
+                                ts = unidecode.unidecode(textract.process(path+"/"+r['filename']).decode('utf-8'))
                             except Exception as e:
-                                print(str(e))
-                            if ts =='':
-                                try:
-                                    ts = unidecode.unidecode(textract.process(path+"/"+r['filename']).decode('utf-8'))
-                                except Exception as e:
-                                    print("Error--->2",str(e))
-                            if len(ts) >1:
-                                try:
-                                    if 'Organo' in ts:
-                                        court = ''
-                                        try:
-                                            court = ts.split('Organo')[1].split('\n')[1]
-                                            if court =='':
-                                                court = ts.split('Organo')[1].split('\n')[2]
-                                                ss = ts.split('Organo')[1].split('\n')[3]
-                                                if '[' in ss and ']' in ss:
-                                                #m = re.search(r"\[([0-9]+)\]", ss)
-                                                    court = court + ' '+ss
-                                            else:
-                                                ss = ts.split('Organo')[1].split('\n')[2]
-                                                if '[' in ss and ']' in ss:
-                                                #m = re.search(r"\[([0-9]+)\]", ss)
-                                                    court = court + ', '+ss
+                                print("Error--->2",str(e))
+                        if len(ts) >1:
+                            try:
+                                if 'Organo' in ts:
+                                    court = ''
+                                    try:
+                                        court = ts.split('Organo')[1].split('\n')[1]
+                                        if court =='':
+                                            court = ts.split('Organo')[1].split('\n')[2]
+                                            ss = ts.split('Organo')[1].split('\n')[3]
+                                            if '[' in ss and ']' in ss:
+                                            #m = re.search(r"\[([0-9]+)\]", ss)
+                                                court = court + ' '+ss
+                                        else:
+                                            ss = ts.split('Organo')[1].split('\n')[2]
+                                            if '[' in ss and ']' in ss:
+                                            #m = re.search(r"\[([0-9]+)\]", ss)
+                                                court = court + ' '+ss
 
-                                            if 'Tipo' in court:
-                                                court = ts.split('Organo')[1].split('\n')[3]
-                                                if court == '':
-                                                    court = ts.split('Organo')[1].split('\n')[4]
-                                        except Exception as e:
-                                            print((str(e)))
-                                        fgdf.loc[fi,'Court']= court
+                                        if 'Tipo' in court:
+                                            court = ts.split('Organo')[1].split('\n')[3]
+                                            if court == '':
+                                                court = ts.split('Organo')[1].split('\n')[4]
+                                    except Exception as e:
+                                        print((str(e)))
+                                    fgdf.loc[fi,'Court']= court
 
-                                    for soli_n in Solicitor_keyword:
-                                        if soli_n in ts:
-                                            fgdf.loc[fi,'Solictor']= soli_n
-                                            break
-                                    tt = ''.join(ts.split())
-                                    if 'Fecha-horaenv' in tt:
-                                        dd = re.search(r'\d{2}/\d{2}/\d{4}\d{2}:\d{2}', tt.split('Fecha-horaenv')[1]).group(0)
-                                        fgdf.loc[fi,"Send_date"] = re.search(r'\d{2}/\d{2}/\d{4}', dd).group(0)+" "+re.search(r'\d{2}:\d{2}', dd).group(0)
-                                except Exception as e:
-                                    print((str(e)))
-                        
-
+                                for soli_n in Solicitor_keyword:
+                                    if soli_n in ts:
+                                        fgdf.loc[fi,'Solictor']= soli_n
+                                        break
+                                tt = ''.join(ts.split())
+                                if 'Fecha-horaenv' in tt:
+                                    dd = re.search(r'\d{2}/\d{2}/\d{4}\d{2}:\d{2}', tt.split('Fecha-horaenv')[1]).group(0)
+                                    fgdf.loc[fi,"Send_date"] = re.search(r'\d{2}/\d{2}/\d{4}', dd).group(0)+" "+re.search(r'\d{2}:\d{2}', dd).group(0)
+                            except Exception as e:
+                                print((str(e)))
 
                 for i,r in fdf[(fdf['filename'].isin(fr['files']))&(fdf['filetype']=='NOTIFICATION')].iterrows():
                     text=r['text_response']
