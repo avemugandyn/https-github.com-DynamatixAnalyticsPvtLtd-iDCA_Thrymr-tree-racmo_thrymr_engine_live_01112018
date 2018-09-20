@@ -757,18 +757,6 @@ class Document_Analysis:
                                 fgdf.loc[fi,'Debtor']=debtor.upper().strip()
                             fgdf.loc[fi,'list_of_possible_debtor']+=list_of_possible_debtor
            
-                            ptype=""
-                            if ptype!="":
-                                if 'procedimiento' in s.lower():
-                                    match=re.search(r'(\d{1,20}/\d{4})',s.split('procedimiento')[1])
-                                else:
-                                    s1=''.join(s.split())
-                                    match1=set(re.findall(r'(\d{1,20}/\d{4})',s1))
-                                    match2={'/'.join(x.split('/')[1:])for x in re.findall(r'(\d{1,2}/\d{1,2}/\d{4})',s1)}
-                            if not match is None :
-                                auto=match.group(0)
-                            elif not (match1-match2) is None :
-                                auto=list(match1-match2)[0] if len(list(match1-match2))>0 else ''
                         except Exception as e:
                             print(str(e))
 
@@ -966,16 +954,6 @@ class Document_Analysis:
                             fgdf.loc[fi,'Court']=js["table_1"]['Destinatarios'][[x for x in list(js["table_1"]['Destinatarios'].keys()) if str(x)[:6].lower()=='organo'][0]]
                         except:
                             print("Court name not in Destinatarios")
-                    auto=""
-                    try:
-                        s=json.loads(unidecode.unidecode(r['table_response']))['table_1']['Datos del mensaje']['Procedimiento destino']
-                    except Exception as e:
-                        s=str( json.loads(r['table_response'])['table_1']['Datos del mensaje'])
-
-                    match1=set(re.findall(r'(\d{1,20}/\d{4})',s))
-                    match2={'/'.join(x.split('/')[1:])for x in re.findall(r'(\d{1,2}/\d{1,2}/\d{4})',s)}
-                    if not (match1-match2) is None :
-                        auto=list(match1-match2)[0]
 
                 else:
                     if r.filename[-3:].lower()!='zip':
@@ -1048,15 +1026,10 @@ class Document_Analysis:
                             fgdf.loc[fi,"Date_of_hearing"]=str(match)
                             break
 
-            if auto=='':
+            if auto =='':
                 sp=fgdf.loc[fi,'files'][0].split('_')
                 try:
                     fgdf.loc[fi,'Auto']=str(int(sp[1]))+'/'+str(int(sp[0]))
-                except Exception as e:
-                    print(e)
-            else:
-                try:
-                    fgdf.loc[fi,'Auto']= str(int(auto.split('/')[0]))+'/'+str(int(auto.split('/')[1]))
                 except Exception as e:
                     print(e)
 
@@ -1201,8 +1174,8 @@ class Document_Analysis:
                                                  creation_date = datetime.datetime.now())
                         model.db.session.add(k)
                         model.db.session.commit()
-                        shutil.copy(join( PDF_DIR,r.filename),join(root_archive,r.filename))
-                        os.remove(join( PDF_DIR,r.filename))
+                        #shutil.copy(join( PDF_DIR,r.filename),join(root_archive,r.filename))
+                        #os.remove(join( PDF_DIR,r.filename))
                 except Exception as e:
                     print(e)
 
