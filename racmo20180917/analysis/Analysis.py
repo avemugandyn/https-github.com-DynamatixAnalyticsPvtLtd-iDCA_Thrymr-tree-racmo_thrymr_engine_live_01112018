@@ -645,13 +645,13 @@ class Document_Analysis:
         kdf,suspkdf = Document_Analysis.keywordimport()
         Procedure_Type_Mapping = {'131': 'HIP','176': 'CON','186': 'CON','1EH': 'HIP','1MO': 'MON','1NJ': 'ETN','1TJ': 'ETJ','2AM': 'DCO',
                      '2CS': 'EJE','AJM': 'AUX','ASE': 'CON','CAC': 'CON','CNA': 'CON','CNC': 'DCO','CNO': 'CON','CNS': 'CON','COG': 'COG',
-                     'CON': 'CON','DPR': 'DP','EJC': 'EJE','EJH': 'HIP','ENJ': 'ETN','ETJ': 'ETJ','FIC': 'DCO','I62': 'CON','ICO': 'CON',
+                     'CON': 'CON','DPR': 'DP','EJC': 'EJE','EJH': 'HIP','ENJ': 'ETN','ETJ': 'ETJ','FIC': 'OTH','I62': 'CON','ICO': 'CON',
                      'JCB': 'CAM','JCU': 'JC','JVB': 'VER','MCC': 'MC','MNC': 'MCU','MON': 'MON','NUL': 'ETNJ','ORD': 'ORD','PCA': 'CON',
                      'PCI': 'CON','PCO': 'CON','PLD': 'PLD','POE': 'ETJ','POH': 'PSO','POJ': 'PSO','PTC': 'PTC','PTG': 'VER','RCA': 'RCS',
                      'RPL': 'RAP','S02': 'CON','S03': 'CON','S04': 'CON','S05': 'CON','S1C': 'CON','S2A': 'CON','S4P': 'CON','S5C': 'CON',
                      'S5L': 'CON','SC2': 'CON','SC4': 'CON','SC5': 'CON','SC6': 'CON','TCD': 'TDO','TMH': 'TMD','V14': 'CNJ','VRB': 'VER',
-                     'X39': 'CNJ','X53': 'DCO','S3A':'CON','PMC':'MC','PIE':'OTH','CUP':'OTH','181':'CON','CAB':'OTH','CUA':'JC','I96':'CON',
-                     'ITC':'OTH','SCA':'CON','X00':'DP'}
+                     'X39': 'CNJ','X53': 'DCO','S3A':'CON','PMC':'MC','PIE':'OTH','CUP':'OTH','181':'CON','CAB':'OTH','CUA':'JC','196':'CON',
+                     'ITC':'OTH','SCA':'CON','X00':'DP','192':'CON'}
 
         time_frame_day = {'catorce': '14','catorze': '14','cinc': '5','cinco': '5','cuatro': '4','deu': '10','diecinueve': '19','dieciocho': '18',
                   'dieciseis': '16','diecisiete': '17','diez': '10','dinou': '19','disset': '17','divuit': '18','doce': '12','dos': '2',
@@ -1174,8 +1174,8 @@ class Document_Analysis:
                                                  creation_date = datetime.datetime.now())
                         model.db.session.add(k)
                         model.db.session.commit()
-                        #shutil.copy(join( PDF_DIR,r.filename),join(root_archive,r.filename))
-                        #os.remove(join( PDF_DIR,r.filename))
+                        shutil.copy(join( PDF_DIR,r.filename),join(root_archive,r.filename))
+                        os.remove(join( PDF_DIR,r.filename))
                 except Exception as e:
                     print(e)
 
