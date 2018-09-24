@@ -261,9 +261,12 @@ class Document_Analysis:
                     for fileinzip in [x for x in z.namelist()]:
                         if not os.path.isdir(fileinzip):
                             try:
+                                #fileinzip = unidecode.unidecode(fileinzip)
+                                zfdir=join(PDF_DIR, os.path.basename(fileinzip))
+                            except Exception as e:
                                 fileinzip = unidecode.unidecode(fileinzip)
                                 zfdir=join(PDF_DIR, os.path.basename(fileinzip))
-                               
+                            try:
                                 with z.open(os.path.join(fileinzip)) as fz,open(zfdir, 'wb') as zfp:
                                     shutil.copyfileobj(fz, zfp)
                                     #os.remove(zfdir)
@@ -601,43 +604,46 @@ class Document_Analysis:
                     'novecientos':'900','mil':'1000','dos mil':'2000','cuatro mil':'4000','diez mil':'10000' }
         if 'centimos' in am_txt:
             am = am_txt.split('centimos')[0]
-            f_am1, f_am2,f_am = 0, 0, 0
-            if 'euros' in am:
-                am_lst = am.split('euros')
-                first_part = am_lst[0].split()
-                sec_part = am_lst[1].split()
-                if 'mil' in first_part:
-                    ind = first_part.index('mil')
-                    up_val ,low_val= 0, 0
-                    for z in [sp_no_dict[y] for y in [v1 for x,v1 in enumerate(first_part) if x < ind] if y in list(sp_no_dict.keys())]:
-                        up_val = up_val+float(z)
-                    for z in [sp_no_dict[y] for y in [v1 for x,v1 in enumerate(first_part) if x > ind] if y in list(sp_no_dict.keys())]:
-                        low_val = low_val+float(z)
-                    f_am1 = (float(sp_no_dict[first_part[ind]])*float(up_val))+float(low_val)
-                else: 
-                    for v in first_part:
-                        if v in list(sp_no_dict.keys()):
-                            f_am1 = f_am1 + float(sp_no_dict[v])
-                for v1 in sec_part:
-                    if v1 !='y':
-                        if v1 in list(sp_no_dict.keys()):
-                            f_am2 = f_am2 + float(sp_no_dict[v1])
+            if len(am)<150:
+                f_am1, f_am2,f_am = 0, 0, 0
+                if 'euros' in am:
+                    am_lst = am.split('euros')
+                    first_part = am_lst[0].split()
+                    sec_part = am_lst[1].split()
+                    if 'mil' in first_part:
+                        ind = first_part.index('mil')
+                        up_val ,low_val= 0, 0
+                        for z in [sp_no_dict[y] for y in [v1 for x,v1 in enumerate(first_part) if x < ind] if y in list(sp_no_dict.keys())]:
+                            up_val = up_val+float(z)
+                        for z in [sp_no_dict[y] for y in [v1 for x,v1 in enumerate(first_part) if x > ind] if y in list(sp_no_dict.keys())]:
+                            low_val = low_val+float(z)
+                        f_am1 = (float(sp_no_dict[first_part[ind]])*float(up_val))+float(low_val)
+                    else: 
+                        for v in first_part:
+                            if v in list(sp_no_dict.keys()):
+                                f_am1 = f_am1 + float(sp_no_dict[v])
+                    for v1 in sec_part:
+                        if v1 !='y':
+                            if v1 in list(sp_no_dict.keys()):
+                                f_am2 = f_am2 + float(sp_no_dict[v1])
             f_a = float(f_am1) + (float(f_am2)/100)
         elif 'euros' in am_txt :
-            am_lst = am_txt.split('euros')[0].split()
-            if 'mil' in am_lst:
-                ind = am_lst.index('mil')
-                up_val ,low_val= 0, 0
-                for z in [sp_no_dict[y] for y in [v1 for x,v1 in enumerate(am_lst) if x < ind] if y in list(sp_no_dict.keys())]:
-                    up_val = up_val+float(z)
-                for z in [sp_no_dict[y] for y in [v1 for x,v1 in enumerate(am_lst) if x > ind] if y in list(sp_no_dict.keys())]:
-                    low_val = low_val+float(z)
-                f_a = (float(sp_no_dict[am_lst[ind]])*float(up_val))+float(low_val)
-            else:
-                for v in am_lst:
-                    if v !='y':
-                        if v in list(sp_no_dict.keys()):
-                            f_a = f_a + float(sp_no_dict[v])
+            am_lst = am_txt.split('euros')[0]
+            if len(am_lst) <150:
+                am_lst = am_lst.split()
+                if 'mil' in am_lst:
+                    ind = am_lst.index('mil')
+                    up_val ,low_val= 0, 0
+                    for z in [sp_no_dict[y] for y in [v1 for x,v1 in enumerate(am_lst) if x < ind] if y in list(sp_no_dict.keys())]:
+                        up_val = up_val+float(z)
+                    for z in [sp_no_dict[y] for y in [v1 for x,v1 in enumerate(am_lst) if x > ind] if y in list(sp_no_dict.keys())]:
+                        low_val = low_val+float(z)
+                    f_a = (float(sp_no_dict[am_lst[ind]])*float(up_val))+float(low_val)
+                else:
+                    for v in am_lst:
+                        if v !='y':
+                            if v in list(sp_no_dict.keys()):
+                                f_a = f_a + float(sp_no_dict[v])
         return f_a
     
     
