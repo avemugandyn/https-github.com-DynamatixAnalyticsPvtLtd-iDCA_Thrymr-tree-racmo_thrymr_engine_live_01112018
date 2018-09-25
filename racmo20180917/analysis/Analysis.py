@@ -1180,8 +1180,8 @@ class Document_Analysis:
                                                  creation_date = datetime.datetime.now())
                         model.db.session.add(k)
                         model.db.session.commit()
-                        #shutil.copy(join( PDF_DIR,r.filename),join(root_archive,r.filename))
-                        #os.remove(join( PDF_DIR,r.filename))
+                        shutil.copy(join( PDF_DIR,r.filename),join(root_archive,r.filename))
+                        os.remove(join( PDF_DIR,r.filename))
                 except Exception as e:
                     print(e)
 
