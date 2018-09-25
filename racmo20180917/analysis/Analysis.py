@@ -283,8 +283,8 @@ class Document_Analysis:
                                     f_name = f_name.replace('/','_')
                                     if r.filename[:-4] in f_name:
                                         if not os.path.exists(join(PDF_DIR,f_name)):
-                                            shutil.move(zfdir, join(PDF_DIR,f_name))
-                                            z_files.append({"filename":f_name,"filegroup":r['filegroup'],\
+                                            shutil.move(zfdir, join(PDF_DIR,unidecode.unidecode(f_name)))
+                                            z_files.append({"filename":unidecode.unidecode(f_name),"filegroup":r['filegroup'],\
                                                 "filetype":"OTHER",'ext':fileinzip[-3:],"length":len(fileinzip)})
                                         else:
                                             os.remove(zfdir)
@@ -1180,8 +1180,8 @@ class Document_Analysis:
                                                  creation_date = datetime.datetime.now())
                         model.db.session.add(k)
                         model.db.session.commit()
-                        shutil.copy(join( PDF_DIR,r.filename),join(root_archive,r.filename))
-                        os.remove(join( PDF_DIR,r.filename))
+                        #shutil.copy(join( PDF_DIR,r.filename),join(root_archive,r.filename))
+                        #os.remove(join( PDF_DIR,r.filename))
                 except Exception as e:
                     print(e)
 
