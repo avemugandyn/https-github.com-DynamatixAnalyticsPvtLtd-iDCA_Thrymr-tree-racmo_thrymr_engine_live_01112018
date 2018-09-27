@@ -1009,7 +1009,7 @@ class Document_Analysis:
                                     fgdf.loc[fi,"Send_date"] = re.search(r'\d{2}/\d{2}/\d{4}', dd).group(0)+" "+re.search(r'\d{2}:\d{2}', dd).group(0)
                             except Exception as e:
                                 print((str(e)))
-
+            if( 'N7' in fr['predicted_classes']):
                 for i,r in fdf[(fdf['filename'].isin(fr['files']))&(fdf['filetype']=='NOTIFICATION')].iterrows():
                     text=r['text_response']
                     text=' '.join(text.split())
@@ -1018,6 +1018,8 @@ class Document_Analysis:
                     text=text.replace('a las','')
                     text=text.replace('a les','')
                     text=text.replace(' a ',' ')
+                    text=text.replace('horas',' ')
+                    text = ' '.join(text.split())
 
                     if "el proximo" in text or "el dia" in text:
                         if "el proximo" in text:
