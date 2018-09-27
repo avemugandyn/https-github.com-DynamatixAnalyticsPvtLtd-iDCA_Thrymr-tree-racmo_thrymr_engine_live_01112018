@@ -952,7 +952,7 @@ class Document_Analysis:
                                 break
                             else:
                                 fgdf.loc[fi,'Solictor']= ''
-                        fgdf.loc[fi,'Court']=js["table_1"]['Remitente'][[x for x in list(js["table_1"]['Remitente'].keys()) if str(x)[:6].lower()=='organo'][0]]
+                        fgdf.loc[fi,'Court']=unidecode.unidecode(js["table_1"]['Remitente'][[x for x in list(js["table_1"]['Remitente'].keys()) if str(x)[:6].lower()=='organo'][0]])
                     except Exception as e:
                         c+=1
                     if fgdf.loc[fi,'Court'] =='' or fgdf.loc[fi,'Court'] == None:
