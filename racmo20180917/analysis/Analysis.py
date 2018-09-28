@@ -681,7 +681,9 @@ class Document_Analysis:
                              'la cantidad retenida a','la suma de','las sumas reclamadas y que son las siguentes: principal:',
                              'las sumas reclamadas y que son las siguientes: principal:','por  importe de',
                              'por las cantidades de','por las siguientes cantidades','principal reclamado','la cuantia de',
-                             'las sumas de','por un importe de','el importe de','cantidad de','pago por','la cantidad consignada de','por importe total de']
+                             'las sumas de','por un importe de','el importe de','cantidad de','pago por','la cantidad consignada de','por importe total de',
+                             'la cantidad ingresada de','cuenta del principal','en la cuenta de consignaciones la cantidad','la cantidad consignada',
+                             'por su importe de','por las cantiades de','las cantidades consignadas a cuenta del principal','de consignaciones de este juzgado, esto es']
 
         months={"enero": "January", "febrero":"February", "marzo": "March","abril": "April",
                 "mayo":"May","junio":"June","julio":"July","agosto":"August","septiembre":"September","octubre":"October",
@@ -720,6 +722,10 @@ class Document_Analysis:
         fgdf['Court']=''
         fgdf['Solictor']=''
         fgdf['Send_date']=''
+        fgdf['Document date']=''
+        fgdf['Auto']=''
+        fgdf['Procedure_Type']=''
+
         c=0
         for fi,fr in fgdf.iterrows():
             auto=""
@@ -798,6 +804,8 @@ class Document_Analysis:
                                             am = re.sub(r'[?|$||!]',r'', am )
                                             am = am.replace('EUR','')
                                             am = am.replace('.-','')
+                                            am = am.replace('(','')
+                                            am = am.replace(')','')
                                             try:
                                                 am = am.replace("¬,","")
                                             except:
@@ -995,6 +1003,12 @@ class Document_Analysis:
                                             court = ts.split('Organo')[1].split('\n')[3]
                                             if court == '':
                                                 court = ts.split('Organo')[1].split('\n')[4]
+
+                                        if 'signature not verified' in court.lower():
+                                             court = ts.split('Organo')[1].split('\n')[8]
+                                             ss = ts.split('Organo')[1].split('\n')[9]
+                                             if '[' in ss and ']' in ss:
+                                                court = court +' '+ ss
                                     except Exception as e:
                                         print((str(e)))
                                     fgdf.loc[fi,'Court']= court
@@ -1115,7 +1129,7 @@ class Document_Analysis:
             print("extraction")
             ex_start_time = time.time()
             fgdf=Document_Analysis.extract_data_from_filegroups(fdf,root_new)
-
+            print(fgdf)
             if len(fgdf) != 0:
                 max_v = model.db.session.query(model.db.func.max(model.ProccessLog.batch_id)).scalar()
                 if max_v==None:
@@ -1170,7 +1184,7 @@ class Document_Analysis:
                         model.db.session.add(kk)
                         model.db.session.commit()
                     except Exception as e:
-                        print(e)
+                        print("fgdf error-->",e)
                 try:               
                     for i , r in fdf.iterrows():
                         k = model.FileClassificationResult(file_name =r['filename'],
