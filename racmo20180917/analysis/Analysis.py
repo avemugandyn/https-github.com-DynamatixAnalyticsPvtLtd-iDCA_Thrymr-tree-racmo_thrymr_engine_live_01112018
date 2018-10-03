@@ -626,7 +626,7 @@ class Document_Analysis:
                         if v1 !='y':
                             if v1 in list(sp_no_dict.keys()):
                                 f_am2 = f_am2 + float(sp_no_dict[v1])
-            f_a = float(f_am1) + (float(f_am2)/100)
+                f_a = float(f_am1) + (float(f_am2)/100)
         elif 'euros' in am_txt :
             am_lst = am_txt.split('euros')[0]
             if len(am_lst) <150:
@@ -732,7 +732,6 @@ class Document_Analysis:
             match=None
             match1=set()
             match2=set()
-            #list_of_possible_debtor = set()
             for i,r in fdf[(fdf['filetype']!='TICKET')&(fdf['filetype']!='CARATULA')&(fdf['filename'].isin(fr['files']))].iterrows():
                 if r['text_response'][:5]!='Error':
                     s = r['text_response']
@@ -776,7 +775,7 @@ class Document_Analysis:
             if('N1'in fr['predicted_classes'])or('N3'in fr['predicted_classes'])or('N4'in fr['predicted_classes'])or('N11'in fr['predicted_classes']):
                 amount_lst = set()
                 for i,r in fdf[(fdf['filename'].isin(fr['files']))&(fdf['filetype']!='TICKET')].iterrows():
-                    text=''.join(r['text_response'].split())
+                    text=''.join(r['text_response'].split()).lower()
                     for k in amount_extraction:
                         if r['text_response'][:5]!='Error':
                             f=True
@@ -793,61 +792,63 @@ class Document_Analysis:
                                 tex_lst=' '.join(r['text_response'].split()).split(k1)[1:]
                                 for tex in tex_lst:
                                     #am= unidecode.unidecode(tex[tex.index(k1)+len(k1):]).split()[0]
-                                    am= unidecode.unidecode(tex).split()[0]
-                                    if len(''.join(am.split()))==1:
-                                        am= unidecode.unidecode(tex).split()[1]
+                                    try:
+                                        am= unidecode.unidecode(tex).split()[0]
+                                        if len(''.join(am.split()))==1:
+                                            am= unidecode.unidecode(tex).split()[1]
                                          #am= unidecode.unidecode(tex[tex.index(k1)+len(k1):]).split()[1]
 
-                                    if am!='en' and len(''.join(am.split()))>1:
-                                        if any(i.isdigit() for i in am):
-                                            am = am.replace('euros','')
-                                            am = re.sub(r'[?|$||!]',r'', am )
-                                            am = am.replace('EUR','')
-                                            am = am.replace('.-','')
-                                            am = am.replace('(','')
-                                            am = am.replace(')','')
-                                            try:
-                                                am = am.replace("¬,","")
-                                            except:
-                                                am = unidecode.unidecode(am).replace("!","")
-                                            condition = '..' in am
-                                            while condition:
-                                                am = am.replace('..','')
+                                        if am!='en' and len(''.join(am.split()))>1:
+                                            if any(i.isdigit() for i in am):
+                                                am = am.replace('euros','')
+                                                am = re.sub(r'[?|$||!]',r'', am )
+                                                am = am.replace('EUR','')
+                                                am = am.replace('.-','')
+                                                am = am.replace('(','')
+                                                am = am.replace(')','')
+                                                try:
+                                                    am = am.replace("¬,","")
+                                                except:
+                                                    am = unidecode.unidecode(am).replace("!","")
                                                 condition = '..' in am
+                                                while condition:
+                                                    am = am.replace('..','')
+                                                    condition = '..' in am
 
-                                            if ('.' in am or ',' in am) and (am[-1] == ',' or am[-1] == '.') :
-                                                am = am[:-1]
-                                            try:
-                                                am = am.replace("´",",")
-                                            except:
-                                                am = unidecode.unidecode(am)
-                                            am = am.replace("'",",")
-                                            if am.count(',') >= 1:
-                                                condition = ',' in am
-                                                while(condition):
-                                                    ind = am.find(',')
-                                                    am = am[0:ind] + '.' + am[ind+1:]
+                                                if ('.' in am or ',' in am) and (am[-1] == ',' or am[-1] == '.') :
+                                                    am = am[:-1]
+                                                try:
+                                                    am = am.replace("´",",")
+                                                except:
+                                                    am = unidecode.unidecode(am)
+                                                am = am.replace("'",",")
+                                                if am.count(',') >= 1:
                                                     condition = ',' in am
+                                                    while(condition):
+                                                        ind = am.find(',')
+                                                        am = am[0:ind] + '.' + am[ind+1:]
+                                                        condition = ',' in am
 
-                                            if am.count('.') > 1:
-                                                condition = '.' in am
-                                                while(condition):
-                                                    ind = am.find('.')
-                                                    if ind != am.rfind('.'):
-                                                        am = am[0:ind] + '' + am[ind+1:]
-                                                    else:
-                                                        condition = False
-                                            fgdf.loc[fi,'Amount']=am
-                                            amount_lst.add(am)
-                                        else:
-                                            am_txt = unidecode.unidecode(tex)
-                                            #am_txt = unidecode.unidecode(tex[tex.index(k1)+len(k1):])
-                                            f_a = Document_Analysis.string_amount_to_numeric(am_txt)
-                                            if f_a != 0:
-                                                fgdf.loc[fi,'Amount']=f_a
-                                                amount_lst.add(f_a)
+                                                if am.count('.') > 1:
+                                                    condition = '.' in am
+                                                    while(condition):
+                                                        ind = am.find('.')
+                                                        if ind != am.rfind('.'):
+                                                            am = am[0:ind] + '' + am[ind+1:]
+                                                        else:
+                                                            condition = False
+                                                fgdf.loc[fi,'Amount']=am
+                                                amount_lst.add(am)
+                                            else:
+                                                am_txt = unidecode.unidecode(tex)
+                                                #am_txt = unidecode.unidecode(tex[tex.index(k1)+len(k1):])
+                                                f_a = Document_Analysis.string_amount_to_numeric(am_txt)
+                                                if f_a != 0:
+                                                    fgdf.loc[fi,'Amount']=f_a
+                                                    amount_lst.add(f_a)
+                                    except Exception as e:
+                                        print(str(e))
                 fgdf.loc[fi,'Amount_list']+=list(amount_lst)
-
 
             if(('N9'in fr['predicted_classes'])or('N10'in fr['predicted_classes']) and ('N1' not in fr['predicted_classes'])):
                 nls, nlc,nlm= [],[],[]
@@ -1129,7 +1130,6 @@ class Document_Analysis:
             print("extraction")
             ex_start_time = time.time()
             fgdf=Document_Analysis.extract_data_from_filegroups(fdf,root_new)
-            print(fgdf)
             if len(fgdf) != 0:
                 max_v = model.db.session.query(model.db.func.max(model.ProccessLog.batch_id)).scalar()
                 if max_v==None:
