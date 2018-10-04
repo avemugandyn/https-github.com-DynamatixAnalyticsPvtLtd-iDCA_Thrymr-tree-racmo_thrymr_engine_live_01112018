@@ -27,6 +27,7 @@ import shutil
 import datetime
 import multiprocessing as mp
 import datefinder
+import zipfile
 
 PDF_DIR = None
 temp_fdf = pd.DataFrame()
@@ -222,14 +223,14 @@ class Document_Analysis:
         text=""
         try:
             if pf[-3:].lower()=='rtf':
-                print('rtf')
+                #print('rtf')
                 newtext =textract.process(pf)
                 newtext=str(newtext,'utf-8')
                 # newtext=newtext
             else:
                 newtext=Document_Analysis.get_pdf_text(pf)
             if(len(newtext.split())==0):
-                print("scan")
+                #print("scan")
                 newtext =textract.process(pf,method='tesseract').decode('utf-8')
             try:
                 newtext=(''.join((c for c in unicodedata.normalize('NFD', newtext) if unicodedata.category(c) != 'Mn'))).lower()
@@ -251,51 +252,53 @@ class Document_Analysis:
 
     def unzip_add(fdf,PDF_DIR):
         ffdf = fdf.copy()
-        import zipfile
-        for i, r in fdf.iterrows():
-            zip_dict ={}
-            if r.filename[-3:].lower()=='zip':
-                z_files = []
-                print((r.filename.split('.')[0]))
-                with zipfile.ZipFile(join(PDF_DIR,r.filename)) as z:
-                    for fileinzip in [x for x in z.namelist()]:
-                        if not os.path.isdir(fileinzip):
-                            try:
-                                #fileinzip = unidecode.unidecode(fileinzip)
-                                zfdir=join(PDF_DIR, os.path.basename(fileinzip))
-                            except Exception as e:
-                                fileinzip = unidecode.unidecode(fileinzip)
-                                zfdir=join(PDF_DIR, os.path.basename(fileinzip))
-                            try:
-                                with z.open(os.path.join(fileinzip)) as fz,open(zfdir, 'wb') as zfp:
-                                    shutil.copyfileobj(fz, zfp)
-                                    #os.remove(zfdir)
-                                    if fileinzip.count('.') > 1:
-                                        condition = '.' in fileinzip
-                                        while(condition):
-                                            ind = fileinzip.find('.')
-                                            if ind != fileinzip.rfind('.'):
-                                                fileinzip = fileinzip[0:ind] + '_' + fileinzip[ind+1:]
-                                            else:
-                                                condition = False
+        #import zipfile
+        try:
+            for i, r in fdf.iterrows():
+                zip_dict ={}
+                if r.filename[-3:].lower()=='zip':
+                    z_files = []
+                    #print((r.filename.split('.')[0]))
+                    with zipfile.ZipFile(join(PDF_DIR,r.filename)) as z:
+                        for fileinzip in [x for x in z.namelist()]:
+                            if not os.path.isdir(fileinzip):
+                                try:
+                                    #fileinzip = unidecode.unidecode(fileinzip)
+                                    zfdir=join(PDF_DIR, os.path.basename(fileinzip))
+                                except Exception as e:
+                                    fileinzip = unidecode.unidecode(fileinzip)
+                                    zfdir=join(PDF_DIR, os.path.basename(fileinzip))
+                                try:
+                                    with z.open(os.path.join(fileinzip)) as fz,open(zfdir, 'wb') as zfp:
+                                        shutil.copyfileobj(fz, zfp)
+                                        #os.remove(zfdir)
+                                        if fileinzip.count('.') > 1:
+                                            condition = '.' in fileinzip
+                                            while(condition):
+                                                ind = fileinzip.find('.')
+                                                if ind != fileinzip.rfind('.'):
+                                                    fileinzip = fileinzip[0:ind] + '_' + fileinzip[ind+1:]
+                                                else:
+                                                    condition = False
 
-                                    f_name = r.filename[:-4]+'_'+str(''.join(fileinzip.split()))
-                                    f_name = f_name.replace('/','_')
-                                    if r.filename[:-4] in f_name:
-                                        if not os.path.exists(join(PDF_DIR,f_name)) and not os.path.exists(join(PDF_DIR,unidecode.unidecode(f_name))):
-                                            shutil.move(zfdir, join(PDF_DIR,unidecode.unidecode(f_name)))
-                                            z_files.append({"filename":unidecode.unidecode(f_name),"filegroup":r['filegroup'],\
-                                                "filetype":"OTHER",'ext':fileinzip[-3:],"length":len(fileinzip)})
-                                        else:
-                                            os.remove(zfdir)
-                            except Exception as e:
-                                 print(e)
-                zip_dict[r['filegroup']]= z_files                                                                  
-            if zip_dict !={}:
-                for k,val in list(zip_dict.items()):
-                    for v in val:
-                        ffdf = ffdf.append(pd.Series(v), ignore_index=True) 
-                   
+                                        f_name = r.filename[:-4]+'_'+str(''.join(fileinzip.split()))
+                                        f_name = f_name.replace('/','_')
+                                        if r.filename[:-4] in f_name:
+                                            if not os.path.exists(join(PDF_DIR,f_name)) and not os.path.exists(join(PDF_DIR,unidecode.unidecode(f_name))):
+                                                shutil.move(zfdir, join(PDF_DIR,unidecode.unidecode(f_name)))
+                                                z_files.append({"filename":unidecode.unidecode(f_name),"filegroup":r['filegroup'],\
+                                                    "filetype":"OTHER",'ext':fileinzip[-3:],"length":len(fileinzip)})
+                                            else:
+                                                os.remove(zfdir)
+                                except Exception as e:
+                                     print(e)
+                    zip_dict[r['filegroup']]= z_files                                                                  
+                if zip_dict !={}:
+                    for k,val in list(zip_dict.items()):
+                        for v in val:
+                            ffdf = ffdf.append(pd.Series(v), ignore_index=True) 
+        except Exception as e:
+            print(str(e))           
         return ffdf         
        
 
@@ -440,7 +443,6 @@ class Document_Analysis:
             if row['filetype']!='TICKET':
             
                 text = (row['text_response']).lower()
-
 
                 text = re.sub(' +',' ', text)
                 text = text.replace('\n', '')
@@ -598,52 +600,58 @@ class Document_Analysis:
         sp_no_dict = {'cero':'0','uno':'1','tres':'3','cuatro':'4','cinco':'5','seis':'6','siete':'7','ocho':'8','nueve':'9','diez':'10',
                     'once':'11','doce':'12','trece':'13','catorce':'14','quince':'15','dieciseis':'16','diecisiete':'17','dieciocho':'18',
                     'diecinueve':'19','veinte':'20','veintiuno':'21','veintidos':'22','veintitres':'23','veinticuatro':'24','veinticinco':'25',
-                    'veintiseis':'26','veintisiete':'27','veintiocho':'28','veintinueve':'29','treinta':'30',
-                    'cuarenta':'40','cincuenta':'50','sesenta':'60','setenta':'70','ochenta':'80','noventa':'90','cien':'100','ciento':'100',
-                    'doscientos':'200','trescientos':'300','cuatrocientos':'400','quinientos':'500','seiscientos':'600','setecientos':'700','ochocientos':'800',
+                    'veintiseis':'26','veintisiete':'27','veintiocho':'28','veintinueve':'29','treinta':'30','cuarenta':'40','cincuenta':'50',
+                    'sesenta':'60','setenta':'70','ochenta':'80','noventa':'90','cien':'100','ciento':'100','doscientos':'200','trescientos':'300',
+                    'cuatrocientos':'400','quinientos':'500','seiscientos':'600','setecientos':'700','ochocientos':'800',
                     'novecientos':'900','mil':'1000','dos mil':'2000','cuatro mil':'4000','diez mil':'10000' }
         if 'centimos' in am_txt:
             am = am_txt.split('centimos')[0]
             if len(am)<150:
                 f_am1, f_am2,f_am = 0, 0, 0
                 if 'euros' in am:
-                    am_lst = am.split('euros')
-                    first_part = am_lst[0].split()
-                    sec_part = am_lst[1].split()
-                    if 'mil' in first_part:
-                        ind = first_part.index('mil')
-                        up_val ,low_val= 0, 0
-                        for z in [sp_no_dict[y] for y in [v1 for x,v1 in enumerate(first_part) if x < ind] if y in list(sp_no_dict.keys())]:
-                            up_val = up_val+float(z)
-                        for z in [sp_no_dict[y] for y in [v1 for x,v1 in enumerate(first_part) if x > ind] if y in list(sp_no_dict.keys())]:
-                            low_val = low_val+float(z)
-                        f_am1 = (float(sp_no_dict[first_part[ind]])*float(up_val))+float(low_val)
-                    else: 
-                        for v in first_part:
-                            if v in list(sp_no_dict.keys()):
-                                f_am1 = f_am1 + float(sp_no_dict[v])
-                    for v1 in sec_part:
-                        if v1 !='y':
-                            if v1 in list(sp_no_dict.keys()):
-                                f_am2 = f_am2 + float(sp_no_dict[v1])
+                    try:
+                        am_lst = am.split('euros')
+                        first_part = am_lst[0].split()
+                        sec_part = am_lst[1].split()
+                        if 'mil' in first_part:
+                            ind = first_part.index('mil')
+                            up_val ,low_val= 0, 0
+                            for z in [sp_no_dict[y] for y in [v1 for x,v1 in enumerate(first_part) if x < ind] if y in list(sp_no_dict.keys())]:
+                                up_val = up_val+float(z)
+                            for z in [sp_no_dict[y] for y in [v1 for x,v1 in enumerate(first_part) if x > ind] if y in list(sp_no_dict.keys())]:
+                                low_val = low_val+float(z)
+                            f_am1 = (float(sp_no_dict[first_part[ind]])*float(up_val))+float(low_val)
+                        else: 
+                            for v in first_part:
+                                if v in list(sp_no_dict.keys()):
+                                    f_am1 = f_am1 + float(sp_no_dict[v])
+                        for v1 in sec_part:
+                            if v1 !='y':
+                                if v1 in list(sp_no_dict.keys()):
+                                    f_am2 = f_am2 + float(sp_no_dict[v1])
+                    except Exception as e:
+                        print(str(e))
                 f_a = float(f_am1) + (float(f_am2)/100)
         elif 'euros' in am_txt :
             am_lst = am_txt.split('euros')[0]
             if len(am_lst) <150:
                 am_lst = am_lst.split()
-                if 'mil' in am_lst:
-                    ind = am_lst.index('mil')
-                    up_val ,low_val= 0, 0
-                    for z in [sp_no_dict[y] for y in [v1 for x,v1 in enumerate(am_lst) if x < ind] if y in list(sp_no_dict.keys())]:
-                        up_val = up_val+float(z)
-                    for z in [sp_no_dict[y] for y in [v1 for x,v1 in enumerate(am_lst) if x > ind] if y in list(sp_no_dict.keys())]:
-                        low_val = low_val+float(z)
-                    f_a = (float(sp_no_dict[am_lst[ind]])*float(up_val))+float(low_val)
-                else:
-                    for v in am_lst:
-                        if v !='y':
-                            if v in list(sp_no_dict.keys()):
-                                f_a = f_a + float(sp_no_dict[v])
+                try:
+                    if 'mil' in am_lst:
+                        ind = am_lst.index('mil')
+                        up_val ,low_val= 0, 0
+                        for z in [sp_no_dict[y] for y in [v1 for x,v1 in enumerate(am_lst) if x < ind] if y in list(sp_no_dict.keys())]:
+                            up_val = up_val+float(z)
+                        for z in [sp_no_dict[y] for y in [v1 for x,v1 in enumerate(am_lst) if x > ind] if y in list(sp_no_dict.keys())]:
+                            low_val = low_val+float(z)
+                        f_a = (float(sp_no_dict[am_lst[ind]])*float(up_val))+float(low_val)
+                    else:
+                        for v in am_lst:
+                            if v !='y':
+                                if v in list(sp_no_dict.keys()):
+                                    f_a = f_a + float(sp_no_dict[v])
+                except Exception as e:
+                    print(str(e))
         return f_a
     
     
@@ -660,12 +668,13 @@ class Document_Analysis:
                      'ITC':'OTH','SCA':'CON','X00':'DP','192':'CON'}
 
         time_frame_day = {'catorce': '14','catorze': '14','cinc': '5','cinco': '5','cuatro': '4','deu': '10','diecinueve': '19','dieciocho': '18',
-                  'dieciseis': '16','diecisiete': '17','diez': '10','dinou': '19','disset': '17','divuit': '18','doce': '12','dos': '2',
-                  'dotze': '12','nou': '9','nueve': '9','ocho': '8','once': '11','onze': '11','quatre': '4','quince': '15','quinze': '15',
-                  'seis': '6','set': '7','setze': '16','siete': '7','sis': '6','trece': '13','treinta': '30','tres': '3','tretze': '13',
-                  'un': '1','uno': '1','veinte': '20','veinticinco': '25','veinticuatro': '24','veintidos': '22','veintinueve': '29','veintiocho': '28',
-                  'veintiseis': '26','veintisiete': '27','veintitres': '23','veintiuno': '21','vint': '20','vuit': '8'
-                 }
+                          'dieciseis': '16','diecisiete': '17','diez': '10','dinou': '19','disset': '17','divuit': '18','doce': '12','dos': '2',
+                          'dotze': '12','nou': '9','nueve': '9','ocho': '8','once': '11','onze': '11','quatre': '4','quince': '15','quinze': '15',
+                          'seis': '6','set': '7','setze': '16','siete': '7','sis': '6','trece': '13','treinta': '30','tres': '3','tretze': '13',
+                          'un': '1','uno': '1','veinte': '20','veinticinco': '25','veinticuatro': '24','veintidos': '22','veintinueve': '29',
+                          'veintiocho': '28','veintiseis': '26','veintisiete': '27','veintitres': '23','veintiuno': '21','vint': '20','vuit': '8'
+                         }
+
         Solicitor_keyword = ['ALCOCER ANTON, DOLORES [783]','GARCIA ABASCAL, SUSANA [721]','MALAGON LOYO, SILVIA [2058]']
 
         debtor_extraction = [ "demandado , demandado , demandado , demandado d/na.","demandado , demandado d/na.","demandado d/na.","demandado: d./dna.",
@@ -685,9 +694,8 @@ class Document_Analysis:
                              'la cantidad ingresada de','cuenta del principal','en la cuenta de consignaciones la cantidad','la cantidad consignada',
                              'por su importe de','por las cantiades de','las cantidades consignadas a cuenta del principal','de consignaciones de este juzgado, esto es']
 
-        months={"enero": "January", "febrero":"February", "marzo": "March","abril": "April",
-                "mayo":"May","junio":"June","julio":"July","agosto":"August","septiembre":"September","octubre":"October",
-                "noviembre":"November", "diciembre":"December"}
+        months={"enero": "January", "febrero":"February", "marzo": "March","abril": "April","mayo":"May","junio":"June","julio":"July","agosto":"August",
+                "septiembre":"September","octubre":"October","noviembre":"November", "diciembre":"December"}
 
         extKeywords=kdf[kdf['purpose']=='EXTRACTION']
         extKeywords['decision_type']=extKeywords['decision_type'].apply(lambda x : x.split('-')[1])
@@ -736,10 +744,11 @@ class Document_Analysis:
                 if r['text_response'][:5]!='Error':
                     s = r['text_response']
                     if len(s.strip())>0:
+                        list_of_possible_debtor = set()
                         try:
                             s=unidecode.unidecode('\n'.join(list([_f for _f in s.split('\n') if _f])).lower())
                             debtor=''
-                            list_of_possible_debtor = set()
+                            #list_of_possible_debtor = set()
                             for deb_ex in debtor_extraction:
                                 if deb_ex in s:
                                     for d in s.split(deb_ex)[1:]: 
@@ -761,7 +770,9 @@ class Document_Analysis:
                                         list_of_possible_debtor=list_of_possible_debtor.union(Document_Analysis.debtor_split(debtor,','))
                                         list_of_possible_debtor=list_of_possible_debtor.union(Document_Analysis.debtor_split(debtor_2lines,' y '))
                                         list_of_possible_debtor=list_of_possible_debtor.union(Document_Analysis.debtor_split(debtor_2lines,','))
-
+                        except Exception as e:
+                            print(str(e))
+                        try:
                             if r['filetype']=='NOTIFICATION' and len(''.join(debtor.split())) >1:
                                 fgdf.loc[fi,'Debtor']=debtor.upper().strip()
                             if len(''.join(fgdf.loc[fi,'Debtor'].split())) <=1 and len(''.join(debtor.split())) >1:
@@ -774,7 +785,7 @@ class Document_Analysis:
 
             if('N1'in fr['predicted_classes'])or('N3'in fr['predicted_classes'])or('N4'in fr['predicted_classes'])or('N11'in fr['predicted_classes']):
                 amount_lst = set()
-                for i,r in fdf[(fdf['filename'].isin(fr['files']))&(fdf['filetype']!='TICKET')].iterrows():
+                for i,r in fdf[(fdf['filename'].isin(fr['files']))&(fdf['filetype']!='TICKET')&(fdf['filetype']!='CARATULA')].iterrows():
                     text=''.join(r['text_response'].split()).lower()
                     for k in amount_extraction:
                         if r['text_response'][:5]!='Error':
@@ -949,7 +960,6 @@ class Document_Analysis:
                     except Exception as e:
                         print(str(e))
                     try:
-                           
                         fgdf.loc[fi,"Send_date"]=js["table_1"][[x for x in list(js["table_1"].keys()) if 'Fecha-hora env' in x][0]]
                     except Exception as e:
                         print(str(e))
@@ -963,12 +973,13 @@ class Document_Analysis:
                                 fgdf.loc[fi,'Solictor']= ''
                         fgdf.loc[fi,'Court']=unidecode.unidecode(js["table_1"]['Remitente'][[x for x in list(js["table_1"]['Remitente'].keys()) if str(x)[:6].lower()=='organo'][0]])
                     except Exception as e:
+                        print(str(e))
                         c+=1
                     if fgdf.loc[fi,'Court'] =='' or fgdf.loc[fi,'Court'] == None:
                         try:
                             fgdf.loc[fi,'Court']=unidecode.unidecode(js["table_1"]['Destinatarios'][[x for x in list(js["table_1"]['Destinatarios'].keys()) if str(x)[:6].lower()=='organo'][0]])
-                        except:
-                            print("Court name not in Destinatarios")
+                        except Exception as e:
+                            print(str(e),"Court name not in Destinatarios")
 
                 else:
                     if r.filename[-3:].lower()!='zip':
@@ -981,7 +992,7 @@ class Document_Analysis:
                             try:
                                 ts = unidecode.unidecode(textract.process(path+"/"+r['filename']).decode('utf-8'))
                             except Exception as e:
-                                print("Error--->2",str(e))
+                                print("Error-",str(e))
                         if len(ts) >1:
                             try:
                                 if 'Organo' in ts:
@@ -1068,7 +1079,7 @@ class Document_Analysis:
         warnings.filterwarnings("ignore")
         t_time = time.time()
         PDF_DIR = root_new
-        pdf_files= [f for f in listdir(PDF_DIR) if isfile(join(PDF_DIR,  f)) ]
+        pdf_files= [f for f in listdir(PDF_DIR) if isfile(join(PDF_DIR,  f))]
         if len(pdf_files)>0:
             ls=list()
             for pdf_file in pdf_files:
@@ -1096,13 +1107,13 @@ class Document_Analysis:
             cmpt_fdf = Document_Analysis.unzip_add(cmpt_fdf,PDF_DIR)
             temp_fdf = cmpt_fdf
             list_of_files = cmpt_fdf['filename'].values.tolist()
-            print("parsing")
+            print("Parsing start")
             parsing_start_t = time.time()
             pool = mp.Pool(processes=mp.cpu_count())
             results = pool.map_async(Document_Analysis.parsefile,list_of_files)
             pool.close()
             pool.join()
-            print(("parsing batch= "+str(1)+"time in minutes ",(float(time.time()-parsing_start_t)/60)))
+            print("Parsing complete(time in minutes) = ",(float(time.time()-parsing_start_t)/60))
             output = results.get()
             final_fdf=pd.concat(output)
            
@@ -1113,7 +1124,7 @@ class Document_Analysis:
             ## notification_corelation_dict
             ############
             #kdf,suspkdf=Document_Analysis.keywordimport()
-            print("classification")
+            print("Classification start")
             classifi_start_time = time.time()
             classi_fdf= fdf
             classi_files = cmpt_fdf['filename'].values.tolist()
@@ -1126,8 +1137,8 @@ class Document_Analysis:
             #fdf=Document_Analysis.get_classify_result(fdf,kdf,suspkdf,notification_corelation_dict)
             classi_output = classi_results.get()
             fdf= pd.concat(classi_output)
-            print(("--classification taking minutes ---",(float(time.time() - classifi_start_time)/60)))
-            print("extraction")
+            print("Classification taking minutes = ",(float(time.time() - classifi_start_time)/60))
+            print("Extraction start")
             ex_start_time = time.time()
             fgdf=Document_Analysis.extract_data_from_filegroups(fdf,root_new)
             if len(fgdf) != 0:
@@ -1185,8 +1196,9 @@ class Document_Analysis:
                         model.db.session.commit()
                     except Exception as e:
                         print("fgdf error-->",e)
-                try:               
-                    for i , r in fdf.iterrows():
+                               
+                for i , r in fdf.iterrows():
+                    try:
                         k = model.FileClassificationResult(file_name =r['filename'],
                                                  file_group =r['filegroup'],
                                                  file_type=r['filetype'],
@@ -1198,12 +1210,12 @@ class Document_Analysis:
                         model.db.session.commit()
                         shutil.copy(join( PDF_DIR,r.filename),join(root_archive,r.filename))
                         os.remove(join( PDF_DIR,r.filename))
-                except Exception as e:
-                    print(e)
+                    except Exception as e:
+                        print(e)
 
 
-            print(("--- Extraction process time ---",(float(time.time() - ex_start_time)/60)))
-            print(("--- Total time in minutes ---",(float(time.time() - t_time)/60)))
+            print("Extraction process time ---",(float(time.time() - ex_start_time)/60))
+            print("Total time in minutes ---",(float(time.time() - t_time)/60))
             model.db.session.close()
             DbConf.client.close() # for close mongoDb connection
             temp_df = pd.DataFrame()
