@@ -1093,6 +1093,7 @@ class Document_Analysis:
         global temp_fdf
         global classi_fdf
         global extract_fdf
+        file_nm_error = list()
         import warnings
         warnings.filterwarnings("ignore")
         t_time = time.time()
@@ -1101,7 +1102,11 @@ class Document_Analysis:
         if len(pdf_files)>0:
             ls=list()
             for pdf_file in pdf_files:
-                ls.append(pdf_file.split('_'))
+                if len(pdf_file.split('_'))>=4 and len(pdf_file.split('_')[2])<=4:
+                    ls.append(pdf_file.split('_'))
+                else:
+                    file_nm_error.append(pdf_file)
+            
             df=pd.DataFrame(ls)
             df = df[pd.notnull(df[3])]
             fg=list(df.groupby(3))
@@ -1252,6 +1257,23 @@ class Document_Analysis:
                         os.remove(join( PDF_DIR,r.filename))
                     except Exception as e:
                         print(e)
+                if len(file_nm_error)>0:
+                    for f_nm in file_nm_error:
+                        try:
+                            kk = model.FileClassificationResult(file_name =f_nm,
+                                                 file_group ='',
+                                                 file_type=f_nm[-3:],
+                                                 predicted_classes='',
+                                                 keyword='',
+                                                 batch_id=newmax,
+                                                 engine_comments ='File name error,please verify manualy',
+                                                 creation_date = datetime.datetime.now())
+                            model.db.session.add(kk)
+                            model.db.session.commit()
+                            shutil.copy(join( PDF_DIR,f_nm),join(root_archive,f_nm))
+                            os.remove(join( PDF_DIR,f_nm))
+                        except Exception as e:
+                            print(e)
 
             print("Extraction process time ---",(float(time.time() - ex_start_time)/60))
             print("Total time in minutes ---",(float(time.time() - t_time)/60))
