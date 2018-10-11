@@ -39,6 +39,7 @@ class Models(object):
             file_group = db.Column(db.Text, nullable=True)
             keyword = db.Column(db.Text, nullable=True)
             predicted_classes = db.Column(db.Text, nullable=True)
+            engine_comments = db.Column(db.Text,nullable=True)
             batch_id = db.Column(db.Integer, nullable = False)
             last_updated_by =  db.Column(db.Integer, nullable = False, default=1)
             creation_date = db.Column(db.Date, nullable = False) #default now()

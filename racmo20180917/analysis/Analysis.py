@@ -28,10 +28,12 @@ import datetime
 import multiprocessing as mp
 import datefinder
 import zipfile
+import signal
 
 PDF_DIR = None
 temp_fdf = pd.DataFrame()
 classi_fdf = pd.DataFrame()
+extract_fdf = pd.DataFrame()
 notification_corelation_dict = { 'N1' : {'N1','N4','N7','N11','N13'},
                                  'N2' : {'N2','N4','N7','N8','N11','N13','N15','N16'},
                                  'N3' : {'N3','N4','N7','N8','N11','N13','N15','N16'},
@@ -150,7 +152,8 @@ class Document_Analysis:
                             esc="|"
         #                         print(x.get("y0"),x.get("y1"),x.text)
                         prev_y=round(float(x.get("y0")))
-                        pdftext+=esc+x.text
+                        if len(x.text)> 0:
+                            pdftext+=esc+x.text
             return pdftext
         except Exception as e:
             return('Error:'+str(e))
@@ -306,7 +309,9 @@ class Document_Analysis:
     def parsefile(file_name):
         global PDF_DIR
         global temp_fdf
-
+        def timeout(signum, frame):
+           raise ValueError('time out,a very specific bad thing happened.')
+        signal.signal(signal.SIGALRM, timeout)
         df = temp_fdf.loc[temp_fdf['filename']==file_name]
         zips_filegroup = {}
         for i, r in df.iterrows():
@@ -314,19 +319,27 @@ class Document_Analysis:
             textresponse=""
             zip_dict = []
             try:
-                ticresponse=Document_Analysis.parse_ticket(join(PDF_DIR,r.filename))
-                # if 'Error:' in ticresponse:
-                #     print(i,ticresponse)
+                signal.alarm(45)
+                while 1:
+                    ticresponse=Document_Analysis.parse_ticket(join(PDF_DIR,r.filename))
+                    if len(ticresponse)>5:
+                        signal.alarm(0)
+                        break
             except Exception as e:
                 ticresponse='Error:'+str(e)
             try:
+                signal.alarm(45)
                 if r.filename[-3:].lower()!='zip':
-                    if r.filetype=='TICKET':
-                        textresponse=ticresponse
-                    else:
-                        textresponse=Document_Analysis.parse_other(join(PDF_DIR,r.filename))
-                        if 'Error:' in textresponse:
-                            print(("text",i,textresponse))
+                    while 1:
+                        if r.filetype=='TICKET':
+                            textresponse=ticresponse
+                        else:
+                            textresponse=Document_Analysis.parse_other(join(PDF_DIR,r.filename))
+                            if 'Error:' in textresponse:
+                                print(("text",i,textresponse))
+                        if len(ticresponse)>5:
+                            signal.alarm(0)
+                            break
             except Exception as e:
                 print(e)
                 textresponse='Error:'+str(e)
@@ -335,7 +348,6 @@ class Document_Analysis:
                     
             df.loc[i,"table_response"] = ticresponse
             df.loc[i,"text_response"] = textresponse
-
         return df
 
     # Once the table json is extracted we know which is the principal notification file and moves on to update it
@@ -655,8 +667,13 @@ class Document_Analysis:
         return f_a
     
     
-    def extract_data_from_filegroups(fdf,path):
+#    def extract_data_from_filegroups(fdf,path):
+    def extract_data_from_filegroups(file_grp):
+        global PDF_DIR
+        global extract_fdf
         kdf,suspkdf = Document_Analysis.keywordimport()
+        fdf = extract_fdf.loc[extract_fdf['filegroup']==file_grp]
+        path = PDF_DIR
         Procedure_Type_Mapping = {'131': 'HIP','176': 'CON','186': 'CON','1EH': 'HIP','1MO': 'MON','1NJ': 'ETN','1TJ': 'ETJ','2AM': 'DCO',
                      '2CS': 'EJE','AJM': 'AUX','ASE': 'CON','CAC': 'CON','CNA': 'CON','CNC': 'DCO','CNO': 'CON','CNS': 'CON','COG': 'COG',
                      'CON': 'CON','DPR': 'DP','EJC': 'EJE','EJH': 'HIP','ENJ': 'ETN','ETJ': 'ETJ','FIC': 'OTH','I62': 'CON','ICO': 'CON',
@@ -1067,7 +1084,7 @@ class Document_Analysis:
                 except Exception as e:
                     print(e)
 
-        print(c)
+        #print(c)
         return fgdf
 
 
@@ -1075,6 +1092,7 @@ class Document_Analysis:
         global PDF_DIR
         global temp_fdf
         global classi_fdf
+        global extract_fdf
         import warnings
         warnings.filterwarnings("ignore")
         t_time = time.time()
@@ -1139,8 +1157,19 @@ class Document_Analysis:
             fdf= pd.concat(classi_output)
             print("Classification taking minutes = ",(float(time.time() - classifi_start_time)/60))
             print("Extraction start")
+            extract_fdf = fdf
             ex_start_time = time.time()
-            fgdf=Document_Analysis.extract_data_from_filegroups(fdf,root_new)
+
+            ext_filegroup_lst = extract_fdf['filegroup'].unique().tolist()
+            extraction_pool = mp.Pool(processes=mp.cpu_count())
+            ext_results = extraction_pool.map_async(Document_Analysis.extract_data_from_filegroups,ext_filegroup_lst)
+            extraction_pool.close()
+            extraction_pool.join()
+
+            ext_output = ext_results.get()
+            fgdf= pd.concat(ext_output)
+            fgdf = fgdf.reset_index()
+            #fgdf=Document_Analysis.extract_data_from_filegroups(fdf,root_new)
             if len(fgdf) != 0:
                 max_v = model.db.session.query(model.db.func.max(model.ProccessLog.batch_id)).scalar()
                 if max_v==None:
@@ -1199,12 +1228,23 @@ class Document_Analysis:
                                
                 for i , r in fdf.iterrows():
                     try:
-                        k = model.FileClassificationResult(file_name =r['filename'],
+                        if "error:time out,a very specific bad thing happened." in str(r['text_response']).lower():
+                            k = model.FileClassificationResult(file_name =r['filename'],
                                                  file_group =r['filegroup'],
                                                  file_type=r['filetype'],
                                                  predicted_classes=json.dumps(r['final_categ']),
                                                  keyword=json.dumps(r['keywords']),
                                                  batch_id=newmax,
+                                                 engine_comments = str(r['text_response']),
+                                                 creation_date = datetime.datetime.now())
+                        else:
+                            k = model.FileClassificationResult(file_name =r['filename'],
+                                                 file_group =r['filegroup'],
+                                                 file_type=r['filetype'],
+                                                 predicted_classes=json.dumps(r['final_categ']),
+                                                 keyword=json.dumps(r['keywords']),
+                                                 batch_id=newmax,
+                                                 engine_comments ='',
                                                  creation_date = datetime.datetime.now())
                         model.db.session.add(k)
                         model.db.session.commit()
@@ -1213,12 +1253,13 @@ class Document_Analysis:
                     except Exception as e:
                         print(e)
 
-
             print("Extraction process time ---",(float(time.time() - ex_start_time)/60))
             print("Total time in minutes ---",(float(time.time() - t_time)/60))
             model.db.session.close()
             DbConf.client.close() # for close mongoDb connection
             temp_df = pd.DataFrame()
+            classi_fdf = pd.DataFrame()
+            extract_fdf = pd.DataFrame()
             return True
         else:
             return False
