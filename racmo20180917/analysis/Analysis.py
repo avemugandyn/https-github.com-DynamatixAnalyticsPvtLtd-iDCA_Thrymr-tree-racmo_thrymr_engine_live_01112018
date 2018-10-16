@@ -988,13 +988,21 @@ class Document_Analysis:
                                 break
                             else:
                                 fgdf.loc[fi,'Solictor']= ''
-                        fgdf.loc[fi,'Court']=unidecode.unidecode(js["table_1"]['Remitente'][[x for x in list(js["table_1"]['Remitente'].keys()) if str(x)[:6].lower()=='organo'][0]])
+                        #fgdf.loc[fi,'Court']=unidecode.unidecode(js["table_1"]['Remitente'][[x for x in list(js["table_1"]['Remitente'].keys()) if str(x)[:6].lower()=='organo'][0]])
+                        court =unidecode.unidecode(js["table_1"]['Remitente'][[x for x in list(js["table_1"]['Remitente'].keys()) if unidecode.unidecode(str(x)[:6]).lower()=='organo'][0]]) 
+                        m = re.search(r"\[([0-9]+)\]", court)
+                        court = court.split("[")[0]+"["+str(int(m.group(1)))+"]"
+                        fgdf.loc[fi,'Court']=court
                     except Exception as e:
                         print(str(e))
                         c+=1
                     if fgdf.loc[fi,'Court'] =='' or fgdf.loc[fi,'Court'] == None:
                         try:
-                            fgdf.loc[fi,'Court']=unidecode.unidecode(js["table_1"]['Destinatarios'][[x for x in list(js["table_1"]['Destinatarios'].keys()) if str(x)[:6].lower()=='organo'][0]])
+                            court = unidecode.unidecode(js["table_1"]['Destinatarios'][[x for x in list(js["table_1"]['Destinatarios'].keys()) if unidecode.unidecode(str(x)[:6]).lower()=='organo'][0]])    
+                            m = re.search(r"\[([0-9]+)\]", court)
+                            court = court.split("[")[0]+"["+str(int(m.group(1)))+"]"
+                            fgdf.loc[fi,'Court']= court
+                            #fgdf.loc[fi,'Court']=unidecode.unidecode(js["table_1"]['Destinatarios'][[x for x in list(js["table_1"]['Destinatarios'].keys()) if str(x)[:6].lower()=='organo'][0]])
                         except Exception as e:
                             print(str(e),"Court name not in Destinatarios")
 
@@ -1040,6 +1048,46 @@ class Document_Analysis:
                                                 court = court +' '+ ss
                                     except Exception as e:
                                         print((str(e)))
+                                    try:
+                                        m = re.search(r"\[([0-9]+)\]", court)
+                                        court = court.split("[")[0]+"["+str(int(m.group(1)))+"]"
+                                    except Exception as e:
+                                        court = court
+                                    fgdf.loc[fi,'Court']= court
+                #                    fgdf.loc[fi,'Court']= court
+                                elif "rrgano" in ts:
+                                    try:
+                                        court = ts.split('rrgano')[1].split('\n')[1]
+                                        if court =='':
+                                            court = ts.split('rrgano')[1].split('\n')[2]
+                                            ss = ts.split('rrgano')[1].split('\n')[3]
+                                            if '[' in ss and ']' in ss:
+                                            #m = re.search(r"\[([0-9]+)\]", ss)
+                                                court = court + ' '+ss
+                                        else:
+                                            ss = ts.split('rrgano')[1].split('\n')[2]
+                                            if '[' in ss and ']' in ss:
+                                            #m = re.search(r"\[([0-9]+)\]", ss)
+                                                court = court + ', '+ss
+
+                                        if 'Tipo' in court:
+                                            court = ts.split('rrgano')[1].split('\n')[3]
+                                            if court == '':
+                                                court = ts.split('rrgano')[1].split('\n')[4]
+
+                                        if 'signature not verified' in court.lower():
+                                            court = ts.split('rrgano')[1].split('\n')[8]
+                                            ss = ts.split('rrgano')[1].split('\n')[9]
+                                            if '[' in ss and ']' in ss:
+                                                court = court +' '+ ss
+
+                                    except Exception as e:
+                                        print((str(e)))
+                                    try:
+                                        m = re.search(r"\[([0-9]+)\]", court)
+                                        court = court.split("[")[0]+"["+str(int(m.group(1)))+"]"
+                                    except Exception as e:
+                                        court = court
                                     fgdf.loc[fi,'Court']= court
 
                                 for soli_n in Solicitor_keyword:
