@@ -35,6 +35,7 @@ class Models(object):
             __tablename__='file_classification_staging'
             id = db.Column(db.Integer, primary_key=True)
             file_name = db.Column(db.Text, nullable=True)
+            lexnet_filename = db.Column(db.Text, nullable=True)
             file_type = db.Column(db.Text, nullable=True)
             file_group = db.Column(db.Text, nullable=True)
             keyword = db.Column(db.Text, nullable=True)

@@ -380,7 +380,7 @@ class Document_Analysis:
                     else:
                         fdf.loc[fdf['filename'].str.contains(fl),'filetype']="NOTIFICATION"
                     
-        return fdf,fgdf
+        return fdf,fgdf  
 
     # A recursive function used for classification based on the hierarchy of the keywords and and its occurence in a particuar file
     def get_predclass_normal(kdf,row,j,text,fdf):
@@ -1281,8 +1281,26 @@ class Document_Analysis:
                                
                 for i , r in fdf.iterrows():
                     try:
+                        # _JUST/ _CART/_NOTIS/_OTHERS
+                        if not ('_JUST' in r['filename'] or '_NOTIS' in r['filename'] or '_CART' in r['filename'] or '_OTHERS' in r['filename']):
+                            new_filename = ''.join(r['filename'].split())
+                            if r['filetype'] == "TICKET":
+                                new_filename = unidecode.unidecode(new_filename[:-4]+str('_JUST')+str(new_filename[-4:]))
+                            elif r['filetype'] == "NOTIFICATION":
+                                new_filename = unidecode.unidecode(new_filename[:-4]+str('_NOTIS')+str(new_filename[-4:]))
+                            elif r['filetype'] == "CARATULA":  
+                                new_filename = unidecode.unidecode(new_filename[:-4]+str('_CART')+str(new_filename[-4:]))
+                            elif r['filetype'] == "OTHER":
+                                new_filename = unidecode.unidecode(new_filename[:-4]+str('_OTHERS')+str(new_filename[-4:]))
+                            else:
+                                new_filename = unidecode.unidecode(new_filename[:-4]+'_'+str(r['filetype']+str(new_filename[-4:])))
+                            #shutil.move(zfdir, join(PDF_DIR,new_filename))
+                        else:
+                            new_filename = ''.join(r['filename'].split())
+
                         if "error:time out,a very specific bad thing happened." in str(r['text_response']).lower():
-                            k = model.FileClassificationResult(file_name =r['filename'],
+                            k = model.FileClassificationResult(file_name =new_filename,
+                                                 lexnet_filename = r['filename'],
                                                  file_group =r['filegroup'],
                                                  file_type=r['filetype'],
                                                  predicted_classes=json.dumps(r['final_categ']),
@@ -1291,7 +1309,8 @@ class Document_Analysis:
                                                  engine_comments = str(r['text_response']),
                                                  creation_date = datetime.datetime.now())
                         else:
-                            k = model.FileClassificationResult(file_name =r['filename'],
+                            k = model.FileClassificationResult(file_name =new_filename,
+                                                 lexnet_filename =r['filename'],
                                                  file_group =r['filegroup'],
                                                  file_type=r['filetype'],
                                                  predicted_classes=json.dumps(r['final_categ']),
@@ -1301,14 +1320,18 @@ class Document_Analysis:
                                                  creation_date = datetime.datetime.now())
                         model.db.session.add(k)
                         model.db.session.commit()
-                        shutil.copy(join( PDF_DIR,r.filename),join(root_archive,r.filename))
-                        os.remove(join( PDF_DIR,r.filename))
+
+                        zfdir=join(PDF_DIR, os.path.basename(r.filename))
+                        shutil.move(zfdir, join(PDF_DIR,new_filename))
+                        shutil.copy(join( PDF_DIR,new_filename),join(root_archive,new_filename))
+                        os.remove(join( PDF_DIR,new_filename))
                     except Exception as e:
                         print(e)
                 if len(file_nm_error)>0:
                     for f_nm in file_nm_error:
                         try:
-                            kk = model.FileClassificationResult(file_name =f_nm,
+                            kk = model.FileClassificationResult(file_name ='',
+                                                 lexnet_filename = f_nm,
                                                  file_group ='',
                                                  file_type=f_nm[-3:],
                                                  predicted_classes='',
