@@ -84,6 +84,7 @@ class Models(object):
             created_by = db.Column(db.Integer, nullable = False, default=1)
             last_update_date = db.Column(db.Date, nullable = False, default=datetime.datetime.now())
             last_updated_by =  db.Column(db.Integer, nullable = False, default=1)
+            engine_running = db.Column(db.Integer, nullable = False, default=1)
 
         db.create_all()
 
