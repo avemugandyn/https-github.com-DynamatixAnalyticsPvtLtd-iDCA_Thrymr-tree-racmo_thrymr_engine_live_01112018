@@ -750,6 +750,7 @@ class Document_Analysis:
         fgdf['Document date']=''
         fgdf['Auto']=''
         fgdf['Procedure_Type']=''
+        fgdf['NIG']=''
 
         c=0
         for fi,fr in fgdf.iterrows():
@@ -1005,6 +1006,11 @@ class Document_Analysis:
                             #fgdf.loc[fi,'Court']=unidecode.unidecode(js["table_1"]['Destinatarios'][[x for x in list(js["table_1"]['Destinatarios'].keys()) if str(x)[:6].lower()=='organo'][0]])
                         except Exception as e:
                             print(str(e),"Court name not in Destinatarios")
+                    try:
+                        nig_number =unidecode.unidecode(js["table_1"]['Datos del mensaje'][[x for x in list(js["table_1"]['Datos del mensaje'].keys()) if unidecode.unidecode(str(x).lower())=='nig'][0]]) 
+                        fgdf.loc[fi,'NIG']= str(nig_number)
+                    except Exception as e:
+                        print(str(e),"NIG not in table-1")
 
                 else:
                     if r.filename[-3:].lower()!='zip':
@@ -1098,6 +1104,10 @@ class Document_Analysis:
                                 if 'Fecha-horaenv' in tt:
                                     dd = re.search(r'\d{2}/\d{2}/\d{4}\d{2}:\d{2}', tt.split('Fecha-horaenv')[1]).group(0)
                                     fgdf.loc[fi,"Send_date"] = re.search(r'\d{2}/\d{2}/\d{4}', dd).group(0)+" "+re.search(r'\d{2}:\d{2}', dd).group(0)
+                                if 'nig' in ts.lower():
+                                    ts = ts.lower()
+                                    ng_number = ts.split('nig:')[1].split()[0]
+                                    fgdf.loc[fi,'NIG']= str(ng_number).upper()
                             except Exception as e:
                                 print((str(e)))
             if( 'N7' in fr['predicted_classes']):
@@ -1271,6 +1281,8 @@ class Document_Analysis:
                                                    debtor_initial =rr['Debtor'],
                                                    possible_debtors = json.dumps(rr['list_of_possible_debtor']),
                                                    possible_amount = json.dumps(rr['Amount_list']),
+                                                   nig_number = rr['NIG'],
+                                                   nig_number_initial = rr['NIG'],
                                                    debtor = rr['Debtor'],
                                                    batch_id=newmax,
                                                    creation_date = datetime.datetime.now())

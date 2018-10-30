@@ -73,6 +73,8 @@ class Models(object):
             procedure_type_initial = db.Column(db.Text, nullable=True)
             solicitor_initial = db.Column(db.Text, nullable=True)
             auto_initial = db.Column(db.Text, nullable=True)
+            nig_number = db.Column(db.Text, nullable=True)
+            nig_number_initial = db.Column(db.Text, nullable=True)
             creation_date = db.Column(db.Date, nullable = False) #default now()
             last_update_date = db.Column(db.Date, nullable = False,default=datetime.datetime.now())
             
